@@ -1,4 +1,5 @@
 
+
 import { Injectable, signal, inject, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import {
@@ -496,5 +497,10 @@ export class SupabaseService {
       if (clockInError) throw clockInError;
       return { profile, dtrEntry: newEntry! };
     }
+  }
+  
+  // NEW: Delete a DTR entry
+  async deleteDtrEntry(id: number): Promise<{ error: PostgrestError | null }> {
+    return this.supabase.from('dtr_entries').delete().eq('id', id);
   }
 }

@@ -38,7 +38,7 @@ export class AdminDashboardComponent {
   readonly currentUserRole = this.supabaseService.currentUserRole;
   activeTab = signal<AdminTab>('employees');
 
-  // Search functionality
+  // Employee Search
   searchTerm = signal<string>('');
 
   employees = signal<Profile[]>([]);
@@ -58,10 +58,23 @@ export class AdminDashboardComponent {
     );
   });
 
+  // DTR Signals
+  dtrSearchTerm = signal<string>('');
   dtrEntries = signal<(DtrEntry & { profiles: Profile })[]>([]);
   dtrLoading = signal(true);
   dtrError = signal<string | null>(null);
   
+  filteredDtrEntries = computed(() => {
+    const term = this.dtrSearchTerm().toLowerCase().trim();
+    if (!term) {
+      return this.dtrEntries();
+    }
+    return this.dtrEntries().filter(entry => {
+      const fullName = `${entry.profiles?.first_name || ''} ${entry.profiles?.last_name || ''}`.toLowerCase();
+      return fullName.includes(term);
+    });
+  });
+
   payrolls = signal<(Payroll & { profiles: Profile })[]>([]);
   payrollsLoading = signal(true);
   payrollsError = signal<string | null>(null);
@@ -116,6 +129,11 @@ export class AdminDashboardComponent {
   onSearchTermChange(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.searchTerm.set(value);
+  }
+
+  onDtrSearchTermChange(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.dtrSearchTerm.set(value);
   }
 
   setActiveTab(tab: AdminTab): void {
@@ -290,6 +308,75 @@ export class AdminDashboardComponent {
       this.loadEmployees();
     }
     this.isConfirmModalVisible.set(false);
+  }
+
+  openDeleteDtrConfirmation(entry: DtrEntry & { profiles: Profile }): void {
+    const employeeName = `${entry.profiles?.first_name || 'Unknown'} ${entry.profiles?.last_name || 'Employee'}`;
+    const timeIn = new Date(entry.time_in).toLocaleString();
+    this.confirmModalConfig.set({
+      title: 'Delete DTR Log?',
+      message: `Are you sure you want to delete the time log for ${employeeName} (Clock-in: ${timeIn})? This action is permanent.`,
+      onConfirm: () => this.handleDeleteDtrEntry(entry.id),
+    });
+    this.isConfirmModalVisible.set(true);
+  }
+
+  async handleDeleteDtrEntry(id: number): Promise<void> {
+    const { error } = await this.supabaseService.deleteDtrEntry(id);
+    if (error) {
+      alert(`Error deleting DTR log: ${error.message}`);
+    } else {
+      this.loadDtrEntries(); // Refresh the list
+    }
+    this.isConfirmModalVisible.set(false);
+  }
+
+  exportDtrToCsv(): void {
+    const entries = this.filteredDtrEntries();
+    if (entries.length === 0) {
+      alert('No DTR data to export.');
+      return;
+    }
+
+    const headers = ['Employee Name', 'Time In', 'Time Out', 'Duration (Hours)'];
+    
+    const formatDate = (dateString: string | null | undefined): string => {
+        if (!dateString) return '';
+        const d = new Date(dateString);
+        const pad = (num: number) => num.toString().padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    };
+    
+    const csvRows = entries.map(entry => {
+      const escapeCsv = (str: string | undefined | null) => `"${(str || '').replace(/"/g, '""')}"`;
+
+      const name = escapeCsv(`${entry.profiles?.first_name || ''} ${entry.profiles?.last_name || ''}`);
+      const timeIn = escapeCsv(formatDate(entry.time_in));
+      const timeOut = escapeCsv(formatDate(entry.time_out));
+      
+      let duration = '0.00';
+      if (entry.time_in && entry.time_out) {
+        const start = new Date(entry.time_in).getTime();
+        const end = new Date(entry.time_out).getTime();
+        const hours = (end - start) / (1000 * 60 * 60);
+        duration = hours.toFixed(2);
+      }
+
+      return [name, timeIn, timeOut, duration].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...csvRows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute('download', `dtr-logs-${dateStr}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   async onLogout(): Promise<void> {
