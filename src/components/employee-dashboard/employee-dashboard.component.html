@@ -1,0 +1,249 @@
+<div class="flex h-screen bg-gray-100 dark:bg-gray-900">
+  <!-- Sidebar -->
+  <aside class="w-64 flex-shrink-0 bg-gray-800 dark:bg-gray-900 text-white flex flex-col">
+    <div class="h-16 flex items-center justify-center px-4 bg-gray-900 dark:bg-black/20">
+      <h2 class="text-2xl font-bold text-white tracking-wider">Employee</h2>
+    </div>
+    <nav class="flex-grow px-2 py-4 space-y-2">
+      <button 
+        (click)="setActiveTab('dtr')"
+        [class.bg-indigo-600]="activeTab() === 'dtr'"
+        [class.hover:bg-gray-700]="activeTab() !== 'dtr'"
+        class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
+        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+        <span class="font-medium">Daily Time Record</span>
+      </button>
+      <button 
+        (click)="setActiveTab('profile')"
+        [class.bg-indigo-600]="activeTab() === 'profile'"
+        [class.hover:bg-gray-700]="activeTab() !== 'profile'"
+        class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
+        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+        <span class="font-medium">My Profile</span>
+      </button>
+      <button 
+        (click)="setActiveTab('payroll')"
+        [class.bg-indigo-600]="activeTab() === 'payroll'"
+        [class.hover:bg-gray-700]="activeTab() !== 'payroll'"
+        class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
+        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+        <span class="font-medium">Payroll History</span>
+      </button>
+    </nav>
+    <div class="p-4 border-t border-gray-700">
+        @if (logoutError()) {
+          <div class="mb-2 p-2 text-xs text-center text-red-200 bg-red-800 rounded-md">
+            {{ logoutError() }}
+          </div>
+        }
+        <button (click)="onLogout()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300">
+          Logout
+        </button>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- Header -->
+    <header class="bg-white dark:bg-gray-800 shadow-md">
+      <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+        @switch (activeTab()) {
+          @case ('dtr') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Time Clock</h1> }
+          @case ('profile') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1> }
+          @case ('payroll') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Payroll History</h1> }
+        }
+        <span class="text-sm hidden sm:inline text-gray-700 dark:text-gray-300">Welcome, {{ userEmail() }}</span>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900">
+      <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        @switch (activeTab()) {
+          @case ('dtr') {
+            <div class="px-4 py-6 sm:px-0 space-y-8">
+              <!-- DTR Main Section -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="text-center md:text-left">
+                  <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Time Clock Status</h2>
+                  @if (isClockedIn()) {
+                    <p class="text-green-500 font-semibold mt-1">
+                      Currently Clocked In
+                      @if(openDtrEntry(); as entry) {
+                        <span class="text-sm text-gray-500 dark:text-gray-400 block">Since: {{ entry.time_in | date:'mediumTime' }}</span>
+                      }
+                    </p>
+                  } @else {
+                    <p class="text-red-500 font-semibold mt-1">Currently Clocked Out</p>
+                  }
+                </div>
+                <button 
+                  (click)="toggleClock()"
+                  [disabled]="clockingInProgress() || dtrLoading()"
+                  class="w-full md:w-auto px-12 py-4 text-lg font-bold text-white rounded-lg shadow-md transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                  [class.bg-green-600]="!isClockedIn()" [class.hover:bg-green-700]="!isClockedIn()"
+                  [class.bg-red-600]="isClockedIn()" [class.hover:bg-red-700]="isClockedIn()">
+                  @if(clockingInProgress()) { <span>Processing...</span> } 
+                  @else { <span>{{ isClockedIn() ? 'Clock Out' : 'Clock In' }}</span> }
+                </button>
+              </div>
+
+              @if (dtrError()) {
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg" role="alert">
+                    <strong class="font-bold">Error:</strong>
+                    <span class="block sm:inline ml-2">{{ dtrError() }}</span>
+                </div>
+              }
+
+              <!-- Time Log History -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                  <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                      <h3 class="text-xl font-bold text-gray-900 dark:text-white">Time Log History</h3>
+                  </div>
+                  <div class="p-6">
+                    @if(dtrLoading()) {
+                      <p class="text-center text-gray-500 dark:text-gray-400">Loading your time log...</p>
+                    } @else if (dtrHistory().length === 0) {
+                      <p class="text-center text-gray-500 dark:text-gray-400">You have no time entries yet.</p>
+                    } @else {
+                      <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Clock In</th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Clock Out</th>
+                            </tr>
+                          </thead>
+                          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            @for(entry of dtrHistory(); track entry.id) {
+                              <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ entry.time_in | date:'longDate' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400 font-semibold">{{ entry.time_in | date:'mediumTime' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400 font-semibold">
+                                  @if(entry.time_out) { {{ entry.time_out | date:'mediumTime' }} } 
+                                  @else { <span class="text-gray-500">In Progress</span> }
+                                </td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    }
+                  </div>
+              </div>
+            </div>
+          }
+          @case ('profile') {
+            <div class="px-4 py-6 sm:px-0">
+              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">Profile Information</h3>
+                @if (profileLoading()) {
+                  <p class="text-center text-gray-500 dark:text-gray-400">Loading profile...</p>
+                } @else if(profileError()) {
+                  <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
+                    <p class="font-bold">Error</p>
+                    <p>{{ profileError() }}</p>
+                  </div>
+                } @else if (profile(); as p) {
+                  <form (ngSubmit)="onUpdateProfile()" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label for="firstName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">First Name</label>
+                        <input type="text" id="firstName" name="firstName" [ngModel]="firstName()" (ngModelChange)="firstName.set($event)" class="mt-1 block w-full px-4 py-2 rounded-lg bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 dark:text-gray-200 placeholder-gray-500 transition duration-200 ease-in-out">
+                      </div>
+                      <div>
+                        <label for="lastName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Last Name</label>
+                        <input type="text" id="lastName" name="lastName" [ngModel]="lastName()" (ngModelChange)="lastName.set($event)" class="mt-1 block w-full px-4 py-2 rounded-lg bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 dark:text-gray-200 placeholder-gray-500 transition duration-200 ease-in-out">
+                      </div>
+                      <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email Address</label>
+                        <input type="email" id="email" name="email" [ngModel]="userEmail()" disabled class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 dark:text-gray-200 placeholder-gray-500 transition duration-200 ease-in-out cursor-not-allowed">
+                      </div>
+                      <div>
+                        <label for="position" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Position</label>
+                        <input type="text" id="position" name="position" [ngModel]="p.position" disabled class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 dark:text-gray-200 placeholder-gray-500 transition duration-200 ease-in-out cursor-not-allowed">
+                      </div>
+                      <div class="md:col-span-2">
+                        <label for="hourlyRate" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Hourly Rate</label>
+                        <input type="text" id="hourlyRate" name="hourlyRate" [ngModel]="p.hourly_rate ? '$' + p.hourly_rate : 'Not Set'" disabled class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500 text-gray-900 dark:text-gray-200 placeholder-gray-500 transition duration-200 ease-in-out cursor-not-allowed">
+                      </div>
+                    </div>
+                    <div class="pt-2">
+                       <button type="submit" [disabled]="profileUpdateInProgress()" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors duration-300">
+                        @if(profileUpdateInProgress()) {
+                           <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                           <span>Saving...</span>
+                        } @else {
+                           <span>Save Changes</span>
+                        }
+                       </button>
+                    </div>
+                  </form>
+                  @if(profileMessage(); as msg) {
+                    <div class="mt-6 p-4 rounded-lg border" [class.bg-red-100]="msg.type === 'error'" [class.border-red-400]="msg.type === 'error'" [class.text-red-700]="msg.type === 'error'" [class.bg-green-100]="msg.type === 'success'" [class.border-green-400]="msg.type === 'success'" [class.text-green-700]="msg.type === 'success'">
+                      <p><strong class="font-bold">{{ msg.type === 'success' ? 'Success' : 'Error' }}:</strong> {{ msg.text }}</p>
+                    </div>
+                  }
+                }
+              </div>
+            </div>
+          }
+           @case ('payroll') {
+            <div class="px-4 py-6 sm:px-0">
+              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Payroll History</h3>
+                </div>
+                <div class="p-6">
+                  @if(payrollsLoading()) {
+                    <p class="text-center text-gray-500 dark:text-gray-400">Loading your payroll history...</p>
+                  } @else if (payrollsError()) {
+                    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
+                      <p class="font-bold">Error</p>
+                      <p>{{ payrollsError() }}</p>
+                    </div>
+                  } @else if (payrolls().length === 0) {
+                     <p class="text-center text-gray-500 dark:text-gray-400">No payroll records have been generated for you yet.</p>
+                  } @else {
+                    <div class="overflow-x-auto">
+                      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                          <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Pay Period</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Gross Pay</th>
+                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Deductions</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Net Pay</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                          @for(p of payrolls(); track p.id) {
+                            <tr>
+                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ p.pay_period_start | date:'mediumDate' }} to {{ p.pay_period_end | date:'mediumDate' }}</td>
+                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ p.gross_pay | currency }}</td>
+                              <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500 dark:text-red-400">{{ p.deductions | currency }}</td>
+                              <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-700 dark:text-gray-200">{{ p.net_pay | currency }}</td>
+                              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                                  [class.bg-yellow-100]="p.status === 'pending'" [class.text-yellow-800]="p.status === 'pending'"
+                                  [class.bg-blue-100]="p.status === 'processing'" [class.text-blue-800]="p.status === 'processing'"
+                                  [class.bg-green-100]="p.status === 'paid'" [class.text-green-800]="p.status === 'paid'">
+                                  {{ p.status }}
+                                </span>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </main>
+  </div>
+</div>

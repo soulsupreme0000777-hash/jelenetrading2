@@ -1,0 +1,14 @@
+/* For the status indicator dot on employee cards */
+.status-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0.875rem; /* 14px */
+  height: 0.875rem; /* 14px */
+  border-radius: 9999px;
+  border: 2px solid white;
+}
+
+.dark .status-dot {
+    border-color: #1f2937; /* Tailwind's gray-800 */
+}

@@ -1,0 +1,324 @@
+<div class="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans">
+  <!-- Sidebar -->
+  <div class="w-64 bg-white dark:bg-gray-800 text-gray-800 dark:text-white flex-col border-r border-gray-200 dark:border-gray-700 hidden sm:flex">
+    <!-- Sidebar Header -->
+    <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+      <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Admin Panel</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400">Payroll & HR Management</p>
+    </div>
+    
+    <!-- Navigation -->
+    <nav class="flex-1 px-4 py-4 space-y-1">
+        <a href="#" (click)="setActiveTab('employees'); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'employees'" [class.text-white]="activeTab() === 'employees'" [class.hover:bg-gray-100]="activeTab() !== 'employees'" [class.dark:hover:bg-gray-700]="activeTab() !== 'employees'">
+           <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.67c.625-.934 1-2.122 1-3.417v-.175a6.375 6.375 0 015.375-6.232A12.318 12.318 0 0118.375 3.625c-2.331 0-4.512.645-6.374 1.766l-.001.109a6.375 6.375 0 01-11.964 4.67c-.625.934-1 2.122-1 3.417v.175a6.375 6.375 0 01-5.375 6.232A12.318 12.318 0 016.625 19.375c2.331 0 4.512-.645 6.374-1.766l.001.109z" /></svg>
+           <span class="ml-3 font-medium">Employees</span>
+        </a>
+        <a href="#" (click)="setActiveTab('dtr'); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'dtr'" [class.text-white]="activeTab() === 'dtr'" [class.hover:bg-gray-100]="activeTab() !== 'dtr'" [class.dark:hover:bg-gray-700]="activeTab() !== 'dtr'">
+           <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+           <span class="ml-3 font-medium">DTR Logs</span>
+        </a>
+        <a href="#" (click)="setActiveTab('payroll'); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'payroll'" [class.text-white]="activeTab() === 'payroll'" [class.hover:bg-gray-100]="activeTab() !== 'payroll'" [class.dark:hover:bg-gray-700]="activeTab() !== 'payroll'">
+           <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
+           <span class="ml-3 font-medium">Payroll</span>
+        </a>
+        <a href="#" (click)="setActiveTab('departments'); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'departments'" [class.text-white]="activeTab() === 'departments'" [class.hover:bg-gray-100]="activeTab() !== 'departments'" [class.dark:hover:bg-gray-700]="activeTab() !== 'departments'">
+           <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.375M9 12h6.375M9 17.25h6.375" /></svg>
+           <span class="ml-3 font-medium">Departments</span>
+        </a>
+    </nav>
+    
+    <!-- Logout Footer -->
+    <div class="px-4 py-4 mt-auto border-t border-gray-200 dark:border-gray-700">
+      <button (click)="onLogout()" class="w-full flex items-center text-left px-4 py-2 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-red-500 hover:text-white dark:hover:bg-red-600 transition-colors duration-200">
+        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" /></svg>
+        <span class="ml-3 font-medium">Log Out</span>
+      </button>
+      @if(logoutError()){
+        <p class="text-red-500 dark:text-red-400 text-xs mt-2 text-center">{{logoutError()}}</p>
+      }
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <main class="flex-1 p-6 sm:p-8 lg:p-10 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+    <!-- Main Header -->
+    <div class="flex justify-between items-center mb-4">
+        @switch (activeTab()) {
+            @case('employees') {
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Employee Management</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1">View, add, and manage all employees.</p>
+                </div>
+                <button (click)="openAddEmployeeModal()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    <span>Add Employee</span>
+                </button>
+            }
+            @case('dtr') {
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Daily Time Record (DTR) Logs</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1">Review all employee clock-in and clock-out events.</p>
+                </div>
+            }
+            @case('payroll') {
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Payroll History</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1">View past payrolls or run a new one.</p>
+                </div>
+                <button (click)="isRunPayrollModalVisible.set(true)" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span>Run New Payroll</span>
+                </button>
+            }
+            @case('departments') {
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Departments</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1">Manage company departments and roles.</p>
+                </div>
+                <button (click)="openAddDepartmentModal()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    <span>Add Department</span>
+                </button>
+            }
+        }
+    </div>
+
+    @if (activeTab() === 'employees') {
+      <div class="mb-6">
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <input 
+            type="search" 
+            id="employee-search"
+            placeholder="Search by name, email, or ID..." 
+            class="block w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 transition"
+            [value]="searchTerm()"
+            (input)="onSearchTermChange($event)">
+        </div>
+      </div>
+    }
+
+    <!-- Content Body -->
+    @switch (activeTab()) {
+      @case ('employees') {
+        @if(employeesLoading() || departmentsLoading() || openDtrLoading()){ 
+          <p class="text-gray-700 dark:text-gray-300 text-center py-8">Loading employee data...</p> 
+        } @else if(employeesError() || departmentsError() || openDtrError()){ 
+          <p class="text-red-500 text-center py-8">{{ employeesError() || departmentsError() || openDtrError() }}</p> 
+        } @else if (searchTerm() && !filteredEmployees().length) {
+          <div class="text-center py-16 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+            <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75l-2.489-2.489m0 0a3.375 3.375 0 10-4.773-4.773 3.375 3.375 0 004.774 4.774zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 class="mt-2 text-lg font-semibold text-gray-900 dark:text-white">No Results Found</h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Your search for "<span class="font-medium text-gray-800 dark:text-gray-200">{{ searchTerm() }}</span>" did not match any employees.</p>
+          </div>
+        } @else {
+          <div class="space-y-10">
+            @for (dept of departmentsWithEmployees(); track dept.id) {
+              @if (dept.employees.length > 0) {
+                <section>
+                  <h2 class="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 pb-2 border-b-2 border-gray-200 dark:border-gray-700">{{ dept.name }}</h2>
+                  <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
+                    @for (employee of dept.employees; track employee.id) {
+                      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-5 transform transition-transform hover:scale-[1.02] hover:shadow-xl">
+                        <div class="flex items-center space-x-4 mb-4">
+                          <div class="relative flex-shrink-0">
+                             @if(employee.avatar_url) {
+                              <img [src]="employee.avatar_url" alt="Avatar" class="h-16 w-16 rounded-full object-cover">
+                             } @else {
+                              <div class="h-16 w-16 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+                                <svg class="w-8 h-8 text-gray-400 dark:text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>
+                              </div>
+                             }
+                             <div class="status-dot" [class.bg-green-500]="employee.clockStatus === 'Clocked In'" [class.bg-gray-400]="employee.clockStatus === 'Clocked Out'"></div>
+                          </div>
+                          <div>
+                            <p class="font-bold text-lg text-gray-900 dark:text-white">{{employee.first_name}} {{employee.last_name}}</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 -mt-1">{{employee.position}}</p>
+                          </div>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                          <div class="flex items-center gap-2.5">
+                            <svg class="w-4 h-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                            <span>{{ employee.email }}</span>
+                          </div>
+                          <div class="flex items-center gap-2.5">
+                             <svg class="w-4 h-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+                             <span>{{ employee.mobile_number }}</span>
+                          </div>
+                          @if (employee.clockStatus === 'Clocked In' && employee.lastEventTimestamp) {
+                            <div class="flex items-center gap-2.5 pt-1 text-green-600 dark:text-green-400 font-medium">
+                              <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 12a.75.75 0 01.75-.75h12a.75.75 0 010 1.5H6a.75.75 0 01-.75-.75z" /></svg>
+                              <span>Clocked in since {{ employee.lastEventTimestamp | date:'shortTime' }}</span>
+                            </div>
+                          }
+                        </div>
+                        <div class="mt-5 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+                          <button (click)="openEditEmployeeModal(employee)" class="px-3 py-1 text-sm font-medium text-gray-700 bg-gray-100 dark:text-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Edit</button>
+                          <button (click)="openDeleteEmployeeConfirmation(employee)" class="px-3 py-1 text-sm font-medium text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-900/50 rounded-md hover:bg-red-200 dark:hover:bg-red-900/80 transition-colors">Delete</button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </section>
+              }
+            } @empty {
+              <div class="text-center py-16 bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.375M9 12h6.375M9 17.25h6.375" /></svg>
+                <h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">No Departments Found</h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by creating a new department.</p>
+            </div>
+            }
+          </div>
+        }
+      }
+      @case ('dtr') {
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+          @if(dtrLoading()){ <p class="text-gray-700 dark:text-gray-300 text-center p-8">Loading DTR entries...</p> }
+          @else if(dtrError()){ <p class="text-red-500 text-center p-8">{{dtrError()}}</p> }
+          @else {
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Employee</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Time In</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Time Out</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                   @for(entry of dtrEntries(); track entry.id) {
+                    <tr>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{entry.profiles?.first_name}} {{entry.profiles?.last_name}}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{entry.time_in | date:'short'}}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{entry.time_out ? (entry.time_out | date:'short') : 'Not clocked out'}}</td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="3" class="text-center py-8 text-gray-500 dark:text-gray-400">No DTR entries found.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+      @case ('payroll') {
+         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+          @if(payrollsLoading()){ <p class="text-gray-700 dark:text-gray-300 text-center p-8">Loading payrolls...</p> }
+          @else if(payrollsError()){ <p class="text-red-500 text-center p-8">{{payrollsError()}}</p> }
+          @else {
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Employee</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Pay Period</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Net Pay</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  @for(payroll of payrolls(); track payroll.id) {
+                    <tr>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{payroll.profiles?.first_name}} {{payroll.profiles?.last_name}}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{payroll.pay_period_start | date:'shortDate'}} - {{payroll.pay_period_end | date:'shortDate'}}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{payroll.net_pay | currency:'PHP':'symbol':'1.2-2'}}</td>
+                      <td class="px-6 py-4 whitespace-nowrap capitalize">
+                        <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full"
+                          [class.bg-yellow-100]="payroll.status === 'pending'" [class.text-yellow-800]="payroll.status === 'pending'"
+                          [class.dark:bg-yellow-900/50]="payroll.status === 'pending'" [class.dark:text-yellow-300]="payroll.status === 'pending'"
+                          [class.bg-blue-100]="payroll.status === 'processing'" [class.text-blue-800]="payroll.status === 'processing'"
+                          [class.dark:bg-blue-900/50]="payroll.status === 'processing'" [class.dark:text-blue-300]="payroll.status === 'processing'"
+                          [class.bg-green-100]="payroll.status === 'paid'" [class.text-green-800]="payroll.status === 'paid'"
+                          [class.dark:bg-green-900/50]="payroll.status === 'paid'" [class.dark:text-green-300]="payroll.status === 'paid'">
+                          {{ payroll.status }}
+                        </span>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="4" class="text-center py-8 text-gray-500 dark:text-gray-400">No payrolls found.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+      @case ('departments') {
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+          @if(departmentsLoading()){ <p class="text-gray-700 dark:text-gray-300 text-center p-8">Loading departments...</p> }
+          @else if(departmentsError()){ <p class="text-red-500 text-center p-8">{{departmentsError()}}</p> }
+          @else {
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Default Daily Rate</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Work Hours</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Lateness Rules</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                   @for(dept of departments(); track dept.id) {
+                    <tr>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{dept.name}}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{dept.default_hourly_rate | currency:'PHP':'symbol':'1.2-2'}}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{dept.work_start_time}} - {{dept.work_end_time}}</td>
+                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {{dept.grace_period_minutes}} min grace, {{dept.lateness_deduction_per_minute | currency:'PHP'}}/min late
+                       </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-4">
+                        <button (click)="openEditDepartmentModal(dept)" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200">Edit</button>
+                        <button (click)="openDeleteDepartmentConfirmation(dept)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200">Delete</button>
+                      </td>
+                    </tr>
+                  } @empty {
+                     <tr><td colspan="5" class="text-center py-8 text-gray-500 dark:text-gray-400">No departments found.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+    }
+  </main>
+</div>
+
+<app-add-employee-modal 
+  [visible]="isAddEmployeeModalVisible()"
+  [departments]="departments()"
+  [currentUserRole]="currentUserRole()"
+  [employeeToEdit]="employeeToEdit()"
+  (close)="closeEmployeeModal()"
+  (employeeSaved)="refreshAllData()"
+></app-add-employee-modal>
+
+<app-add-department-modal
+  [visible]="isAddDepartmentModalVisible()"
+  [departmentToEdit]="departmentToEdit()"
+  (close)="closeDepartmentModal()"
+  (departmentSaved)="loadDepartments()"
+></app-add-department-modal>
+
+<app-run-payroll-modal
+  [visible]="isRunPayrollModalVisible()"
+  [departments]="departments()"
+  (close)="isRunPayrollModalVisible.set(false)"
+  (payrollRun)="refreshPayrolls()"
+></app-run-payroll-modal>
+
+<app-confirmation-modal
+  [visible]="isConfirmModalVisible()"
+  [title]="confirmModalConfig().title"
+  [message]="confirmModalConfig().message"
+  (close)="isConfirmModalVisible.set(false)"
+  (confirm)="confirmModalConfig().onConfirm()"
+></app-confirmation-modal>
