@@ -1,5 +1,5 @@
 {
-  "name": "Supabase Auth App",
+  "name": "Jelene Trading",
   "description": "A user login and dashboard application that connects to a Supabase backend for authentication.",
   "requestFramePermissions": [
     "camera"
