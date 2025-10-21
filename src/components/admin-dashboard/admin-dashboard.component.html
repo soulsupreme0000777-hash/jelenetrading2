@@ -1,6 +1,15 @@
 <div class="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans">
+  <!-- Mobile Sidebar Backdrop -->
+  @if(isSidebarOpen()) {
+    <div (click)="isSidebarOpen.set(false)" class="fixed inset-0 bg-black/60 z-30 sm:hidden"></div>
+  }
+
   <!-- Sidebar -->
-  <div class="w-64 bg-white dark:bg-gray-800 text-gray-800 dark:text-white flex-col border-r border-gray-200 dark:border-gray-700 hidden sm:flex">
+  <div 
+    class="w-64 bg-white dark:bg-gray-800 text-gray-800 dark:text-white flex flex-col border-r border-gray-200 dark:border-gray-700 fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out sm:relative sm:translate-x-0"
+    [class.-translate-x-full]="!isSidebarOpen()"
+    [class.translate-x-0]="isSidebarOpen()">
+    
     <!-- Sidebar Header -->
     <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
       <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Admin Panel</h1>
@@ -9,19 +18,19 @@
     
     <!-- Navigation -->
     <nav class="flex-1 px-4 py-4 space-y-1">
-        <a href="#" (click)="setActiveTab('employees'); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'employees'" [class.text-white]="activeTab() === 'employees'" [class.hover:bg-gray-100]="activeTab() !== 'employees'" [class.dark:hover:bg-gray-700]="activeTab() !== 'employees'">
+        <a href="#" (click)="setActiveTab('employees'); isSidebarOpen.set(false); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'employees'" [class.text-white]="activeTab() === 'employees'" [class.hover:bg-gray-100]="activeTab() !== 'employees'" [class.dark:hover:bg-gray-700]="activeTab() !== 'employees'">
            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.67c.625-.934 1-2.122 1-3.417v-.175a6.375 6.375 0 015.375-6.232A12.318 12.318 0 0118.375 3.625c-2.331 0-4.512.645-6.374 1.766l-.001.109a6.375 6.375 0 01-11.964 4.67c-.625.934-1 2.122-1 3.417v.175a6.375 6.375 0 01-5.375 6.232A12.318 12.318 0 016.625 19.375c2.331 0 4.512-.645 6.374-1.766l.001.109z" /></svg>
            <span class="ml-3 font-medium">Employees</span>
         </a>
-        <a href="#" (click)="setActiveTab('dtr'); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'dtr'" [class.text-white]="activeTab() === 'dtr'" [class.hover:bg-gray-100]="activeTab() !== 'dtr'" [class.dark:hover:bg-gray-700]="activeTab() !== 'dtr'">
+        <a href="#" (click)="setActiveTab('dtr'); isSidebarOpen.set(false); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'dtr'" [class.text-white]="activeTab() === 'dtr'" [class.hover:bg-gray-100]="activeTab() !== 'dtr'" [class.dark:hover:bg-gray-700]="activeTab() !== 'dtr'">
            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
            <span class="ml-3 font-medium">DTR Logs</span>
         </a>
-        <a href="#" (click)="setActiveTab('payroll'); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'payroll'" [class.text-white]="activeTab() === 'payroll'" [class.hover:bg-gray-100]="activeTab() !== 'payroll'" [class.dark:hover:bg-gray-700]="activeTab() !== 'payroll'">
+        <a href="#" (click)="setActiveTab('payroll'); isSidebarOpen.set(false); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'payroll'" [class.text-white]="activeTab() === 'payroll'" [class.hover:bg-gray-100]="activeTab() !== 'payroll'" [class.dark:hover:bg-gray-700]="activeTab() !== 'payroll'">
            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
            <span class="ml-3 font-medium">Payroll</span>
         </a>
-        <a href="#" (click)="setActiveTab('departments'); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'departments'" [class.text-white]="activeTab() === 'departments'" [class.hover:bg-gray-100]="activeTab() !== 'departments'" [class.dark:hover:bg-gray-700]="activeTab() !== 'departments'">
+        <a href="#" (click)="setActiveTab('departments'); isSidebarOpen.set(false); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'departments'" [class.text-white]="activeTab() === 'departments'" [class.hover:bg-gray-100]="activeTab() !== 'departments'" [class.dark:hover:bg-gray-700]="activeTab() !== 'departments'">
            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.375M9 12h6.375M9 17.25h6.375" /></svg>
            <span class="ml-3 font-medium">Departments</span>
         </a>
@@ -42,51 +51,61 @@
   <!-- Main Content -->
   <main class="flex-1 p-6 sm:p-8 lg:p-10 overflow-y-auto bg-gray-50 dark:bg-gray-900">
     <!-- Main Header -->
-    <div class="flex justify-between items-center mb-4">
+    <div class="flex items-center mb-4">
+      <!-- Burger Button -->
+      <button (click)="isSidebarOpen.set(true)" class="sm:hidden p-2 -ml-2 mr-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none">
+        <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+      </button>
+      
+      <!-- Header Content -->
+      <div class="flex-1 flex justify-between items-center">
         @switch (activeTab()) {
             @case('employees') {
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Employee Management</h1>
-                    <p class="text-gray-500 dark:text-gray-400 mt-1">View, add, and manage all employees.</p>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Employee Management</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">View, add, and manage all employees.</p>
                 </div>
-                <button (click)="openAddEmployeeModal()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
+                <button (click)="openAddEmployeeModal()" class="flex items-center gap-2 px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
                     <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                    <span>Add Employee</span>
+                    <span class="hidden sm:inline">Add Employee</span>
                 </button>
             }
             @case('dtr') {
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Daily Time Record (DTR) Logs</h1>
-                    <p class="text-gray-500 dark:text-gray-400 mt-1">Review all employee clock-in and clock-out events.</p>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">DTR Logs</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">Review all employee clock-in and clock-out events.</p>
                 </div>
-                <button (click)="exportDtrToCsv()" class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition-colors">
+                <button (click)="exportDtrToCsv()" class="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
                     </svg>
-                    <span>Export to CSV</span>
+                    <span class="hidden sm:inline">Export to CSV</span>
                 </button>
             }
             @case('payroll') {
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Payroll History</h1>
-                    <p class="text-gray-500 dark:text-gray-400 mt-1">View past payrolls or run a new one.</p>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Payroll History</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">View past payrolls or run a new one.</p>
                 </div>
-                <button (click)="isRunPayrollModalVisible.set(true)" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
+                <button (click)="isRunPayrollModalVisible.set(true)" class="flex items-center gap-2 px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
                     <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span>Run New Payroll</span>
+                    <span class="hidden sm:inline">Run New Payroll</span>
                 </button>
             }
             @case('departments') {
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Departments</h1>
-                    <p class="text-gray-500 dark:text-gray-400 mt-1">Manage company departments and roles.</p>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Departments</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">Manage company departments and roles.</p>
                 </div>
-                <button (click)="openAddDepartmentModal()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
+                <button (click)="openAddDepartmentModal()" class="flex items-center gap-2 px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
                     <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                    <span>Add Department</span>
+                    <span class="hidden sm:inline">Add Department</span>
                 </button>
             }
         }
+      </div>
     </div>
 
     @if (activeTab() === 'employees') {

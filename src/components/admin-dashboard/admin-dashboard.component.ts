@@ -37,6 +37,7 @@ export class AdminDashboardComponent {
 
   readonly currentUserRole = this.supabaseService.currentUserRole;
   activeTab = signal<AdminTab>('employees');
+  isSidebarOpen = signal(false);
 
   // Employee Search
   searchTerm = signal<string>('');
