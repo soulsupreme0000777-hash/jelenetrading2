@@ -1,3 +1,4 @@
+
 import { Injectable, signal, inject, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import {
@@ -8,6 +9,7 @@ import {
   PostgrestError,
   Session,
 } from '@supabase/supabase-js';
+import { environment } from '../environments/environment';
 
 // --- Type Definitions ---
 
@@ -90,12 +92,6 @@ export interface PayrollPreviewItem {
   net_pay: number;
 }
 
-// IMPORTANT: Replace with your own Supabase project details.
-// You can get these from your Supabase project settings > API
-const SUPABASE_URL = 'https://lzpinyrabienqvttrysp.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6cGlueXJhYmllbnF2dHRyeXNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5MDc5NjYsImV4cCI6MjA3NjQ4Mzk2Nn0.j4V8ZvNJKxwrd6MRc2P1CigcKTS3ZB7Yxuh345lkusM';
-
-
 @Injectable({
   providedIn: 'root',
 })
@@ -113,10 +109,7 @@ export class SupabaseService {
   isInitialized = signal(false);
 
   constructor() {
-    // FIX: Removed check for placeholder Supabase credentials as they have been provided.
-    // This check was causing a TypeScript error due to non-overlapping types.
-    
-    this.supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey);
 
     this.supabase.auth.onAuthStateChange((event, session) => {
       const user = session?.user ?? null;
@@ -418,6 +411,7 @@ export class SupabaseService {
     if (!data || data.length === 0) {
       // Create a PostgrestError-like object for consistency if no row was found.
       const notFoundError: PostgrestError = {
+        name: 'PostgrestError', // FIX: Add the required 'name' property to satisfy the type.
         message: 'Cannot find the profile to update. RLS policies may be preventing access.',
         details: `No profile found for user ID ${userId}`,
         hint: 'Check if the row exists and if your RLS policies allow you to see it.',
