@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, output, signal, inject, computed, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
+import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { SupabaseService, Profile, DtrEntry, PayrollPreviewItem, Payroll, Department } from '../../services/supabase.service';
 
 type ModalStep = 'period' | 'deductions' | 'loading' | 'success' | 'error';
@@ -9,7 +9,7 @@ type ModalStep = 'period' | 'deductions' | 'loading' | 'success' | 'error';
   selector: 'app-run-payroll-modal',
   templateUrl: './run-payroll-modal.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, CurrencyPipe, DatePipe, DecimalPipe],
+  imports: [FormsModule, CurrencyPipe, DecimalPipe],
 })
 export class RunPayrollModalComponent {
   visible = input.required<boolean>();

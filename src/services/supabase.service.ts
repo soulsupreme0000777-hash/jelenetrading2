@@ -415,6 +415,7 @@ export class SupabaseService {
     if (!data) {
       // This handles the "zero rows found" case, which .maybeSingle() returns as data: null.
       const notFoundError: PostgrestError = {
+        name: 'PostgrestError',
         message: 'Update successful, but failed to retrieve the updated profile. RLS policies may be preventing access.',
         details: `No profile found for user ID ${userId} after update.`,
         hint: 'Check that your RLS SELECT policy allows admins to view the profiles they have just updated.',
