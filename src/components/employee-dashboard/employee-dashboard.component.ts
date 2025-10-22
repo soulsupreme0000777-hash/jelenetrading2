@@ -14,7 +14,6 @@ type EmployeeTab = 'dtr' | 'profile' | 'payroll';
 })
 export class EmployeeDashboardComponent {
   private readonly supabaseService = inject(SupabaseService);
-  // FIX: Explicitly type `router` to `Router` to fix type inference issues.
   private readonly router: Router = inject(Router);
 
   user = this.supabaseService.currentUser;

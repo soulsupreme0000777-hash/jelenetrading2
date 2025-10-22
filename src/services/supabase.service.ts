@@ -1,5 +1,6 @@
 
 
+
 import { Injectable, signal, inject, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import {
@@ -12,9 +13,6 @@ import {
 } from '@supabase/supabase-js';
 import { environment } from '../environments/environment';
 
-// --- Type Definitions ---
-
-// FIX: Add NewUserPayload type for creating new users.
 export interface NewUserPayload {
   email: string;
   password: string;
@@ -30,7 +28,6 @@ export interface NewUserPayload {
   };
 }
 
-// FIX: Add UserWithProfile type.
 export interface UserWithProfile extends User {
   profile: Profile;
 }
@@ -46,7 +43,7 @@ export interface Profile {
   mobile_number: string | null;
   role: 'superadmin' | 'admin' | 'employee' | null;
   email: string | null; // The user's email, synced from auth.users
-  status: 'active' | 'inactive'; // NEW: For soft deletes
+  status: 'active' | 'inactive';
 }
 
 export interface DtrEntry {
@@ -74,20 +71,17 @@ export interface Department {
   id: number;
   name: string;
   default_hourly_rate: number;
-  // NEW: Fields for dynamic work hours and lateness deductions
   work_start_time: string; // 'HH:mm' format
   work_end_time: string; // 'HH:mm' format
   lateness_deduction_per_minute: number;
   grace_period_minutes: number;
 }
 
-// NEW: Type for the payroll calculation preview
 export interface PayrollPreviewItem {
   user_id: string;
   profile: Profile;
   total_hours: number;
   gross_pay: number;
-  // NEW: Calculated lateness deductions
   auto_lateness_deductions: number; 
   deductions: number; // Final deductions, can be manually edited
   net_pay: number;
@@ -98,13 +92,10 @@ export interface PayrollPreviewItem {
 })
 export class SupabaseService {
   private supabase: SupabaseClient;
-  // FIX: Explicitly type `router` to `Router` to fix type inference issues.
   private readonly router: Router = inject(Router);
 
-  // --- State Signals ---
   currentUser = signal<User | null | undefined>(undefined);
   currentUserProfile = signal<Profile | null | undefined>(undefined);
-  // NEW: Centralized signal for the user's role
   currentUserRole = computed<'superadmin' | 'admin' | 'employee' | null>(() => this.currentUserProfile()?.role ?? null);
   profileError = signal<string | null>(null);
   isInitialized = signal(false);
@@ -117,9 +108,8 @@ export class SupabaseService {
       this.currentUser.set(user);
 
       if (user) {
-        // Fire-and-forget the profile fetch. 
-        // The rest of the app is reactive and will show a loading state until the profile is available.
-        // This prevents a slow or hanging profile fetch from blocking the entire auth flow.
+        // Fetch profile without blocking auth flow. 
+        // The UI will reactively update when the profile is ready.
         this.fetchUserProfile(user.id);
       } else {
         this.currentUserProfile.set(null);
@@ -129,7 +119,7 @@ export class SupabaseService {
         this.router.navigate(['/login']);
       }
       
-      // Mark the service as initialized immediately. This unblocks guards and other startup logic.
+      // Mark service as initialized to unblock auth guards and startup logic.
       if (!this.isInitialized()) {
         this.isInitialized.set(true);
       }
@@ -281,41 +271,35 @@ export class SupabaseService {
 
   async createNewUser(payload: NewUserPayload): Promise<{ user: User, profile: Profile, qrData: string }> {
     // This function performs all actions as the currently authenticated admin.
-    // It relies on updated RLS policies that allow admins to create profiles and upload avatars for other users.
+    // It relies on RLS policies that allow admins to create profiles and upload avatars.
 
-    // 1. Get the admin's current session to restore it after signUp changes the auth state.
+    // Preserve admin session, as signUp temporarily changes the auth state.
     const { data: { session: adminSession } } = await this.supabase.auth.getSession();
     if (!adminSession) {
       throw new Error("Admin not authenticated. Cannot create user.");
     }
 
-    // 2. Sign up the new user. This is expected to NOT return a session if email confirmation is on.
-    // It will temporarily change the auth state of the client.
     const { data: authData, error: authError } = await this.supabase.auth.signUp({
       email: payload.email,
       password: payload.password,
     });
 
-    if (authError) {
-      throw new Error(`Failed to create user account: ${authError.message}`);
-    }
-    if (!authData.user) {
-      throw new Error('User creation failed: The user account was not created in Supabase Auth.');
-    }
+    if (authError) throw new Error(`Failed to create user account: ${authError.message}`);
+    if (!authData.user) throw new Error('User creation failed: The user account was not created in Supabase Auth.');
 
     const user = authData.user;
 
-    // 3. CRITICAL: Restore the admin session immediately.
+    // Immediately restore the admin session.
     const { error: restoreError } = await this.supabase.auth.setSession({
         access_token: adminSession.access_token,
         refresh_token: adminSession.refresh_token,
     });
     if (restoreError) {
         this.router.navigate(['/login']); // Force re-login for safety
-        throw new Error("Critical error: User auth record was created, but your admin session could not be restored. Please log in again.");
+        throw new Error("Critical error: User auth record was created, but admin session could not be restored. Please log in again.");
     }
 
-    // 4. NOW, authenticated as an admin again, upload the avatar for the new user.
+    // With admin privileges restored, create the user's profile and avatar.
     let avatar_url: string | null = null;
     try {
       if (payload.imageFile) {
@@ -332,11 +316,9 @@ export class SupabaseService {
         avatar_url = urlData.publicUrl;
       }
 
-      // 5. As an admin, UPDATE the profile for the new user.
-      // This assumes a database trigger has already created a basic profile row upon user signup.
+      // This assumes a DB trigger has already created a basic profile row upon user signup.
       const { profileData } = payload;
       const profileToUpdate = {
-        // NOTE: 'id' is used in .eq() and not in the update payload.
         email: user.email,
         avatar_url,
         first_name: profileData.first_name,
@@ -361,10 +343,9 @@ export class SupabaseService {
       }
       
       if (!updatedProfile) {
-        throw new Error('Profile data was not returned after update. This usually means a database trigger to auto-create a profile for new users is missing.');
+        throw new Error('Profile data was not returned after update. A database trigger to auto-create a profile for new users might be missing.');
       }
 
-      // 6. Prepare QR code data.
       const qrData = JSON.stringify({ userId: user.id, email: user.email });
       
       return { user, profile: updatedProfile, qrData };
@@ -383,7 +364,6 @@ export class SupabaseService {
       .single();
   }
   
-  // NEW: Update a department
   async updateDepartment(id: number, departmentData: Partial<Omit<Department, 'id'>>): Promise<{ data: Department | null, error: PostgrestError | null }> {
     return this.supabase
       .from('departments')
@@ -393,12 +373,10 @@ export class SupabaseService {
       .single();
   }
 
-  // NEW: Delete a department
   async deleteDepartment(id: number): Promise<{ error: PostgrestError | null }> {
     return this.supabase.from('departments').delete().eq('id', id);
   }
 
-  // NEW: Update any user's profile (for admins)
   async updateUserProfile(userId: string, profileData: Partial<Profile>): Promise<{ data: Profile | null, error: PostgrestError | null }> {
     const { data, error } = await this.supabase
       .from('profiles')
@@ -408,12 +386,11 @@ export class SupabaseService {
       .maybeSingle();
 
     if (error) {
-      // This will now only catch multi-row errors, which shouldn't happen with .eq('id', ...).
       return { data: null, error };
     }
     
     if (!data) {
-      // This handles the "zero rows found" case, which .maybeSingle() returns as data: null.
+      // This handles the "zero rows found" case from .maybeSingle().
       const notFoundError: PostgrestError = {
         name: 'PostgrestError',
         message: 'Update successful, but failed to retrieve the updated profile. RLS policies may be preventing access.',
@@ -453,16 +430,14 @@ export class SupabaseService {
   }
 
   async handleQrCodeLogin(userId: string): Promise<{ profile: Profile, dtrEntry: DtrEntry }> {
-    // This function now securely calls a database function (RPC) to handle the logic.
-    // The 'handle_qr_scan' function MUST be created in your Supabase SQL Editor.
-    // It runs with elevated privileges on the server, safely bypassing RLS policies.
+    // This securely calls a database function (RPC) to handle the logic.
+    // The 'handle_qr_scan' function must be created in your Supabase SQL Editor.
     const { data, error } = await this.supabase.rpc('handle_qr_scan', {
       user_id_input: userId
     });
 
     if (error) {
-      // The RPC function will throw an error if the user is not found,
-      // which Supabase forwards. Make the message more user-friendly.
+      // Make the error from the RPC function more user-friendly.
       if (error.message.includes('User profile not found')) {
         throw new Error('User profile not found. The QR code may be invalid or the employee may no longer be active.');
       }
@@ -473,11 +448,9 @@ export class SupabaseService {
         throw new Error('Received an invalid response from the server after QR scan.');
     }
     
-    // The RPC function returns a single JSON object with the expected structure.
     return data;
   }
   
-  // NEW: Delete a DTR entry
   async deleteDtrEntry(id: number): Promise<{ error: PostgrestError | null }> {
     return this.supabase.from('dtr_entries').delete().eq('id', id);
   }

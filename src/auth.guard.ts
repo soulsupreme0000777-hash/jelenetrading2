@@ -4,7 +4,6 @@ import { SupabaseService } from './services/supabase.service';
 
 export const authGuard: CanActivateFn = () => {
   const supabaseService = inject(SupabaseService);
-  // FIX: Explicitly type `router` to `Router` to fix type inference issues.
   const router: Router = inject(Router);
 
   // Use a promise that resolves once the Supabase service is initialized.
