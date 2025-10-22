@@ -400,51 +400,32 @@ export class SupabaseService {
 
   // NEW: Update any user's profile (for admins)
   async updateUserProfile(userId: string, profileData: Partial<Profile>): Promise<{ data: Profile | null, error: PostgrestError | null }> {
-     const { data, error } = await this.supabase
+    const { data, error } = await this.supabase
       .from('profiles')
       .update(profileData)
       .eq('id', userId)
-      .select();
+      .select()
+      .maybeSingle();
 
     if (error) {
+      // This will now only catch multi-row errors, which shouldn't happen with .eq('id', ...).
       return { data: null, error };
     }
-    if (!data || data.length === 0) {
-      // Create a PostgrestError-like object for consistency if no row was found.
+    
+    if (!data) {
+      // This handles the "zero rows found" case, which .maybeSingle() returns as data: null.
       const notFoundError: PostgrestError = {
-        name: 'PostgrestError', // FIX: Add the required 'name' property to satisfy the type.
-        message: 'Cannot find the profile to update. RLS policies may be preventing access.',
-        details: `No profile found for user ID ${userId}`,
-        hint: 'Check if the row exists and if your RLS policies allow you to see it.',
-        code: 'PGRST116' // Mimicking the original "not found" error code
+        message: 'Update successful, but failed to retrieve the updated profile. RLS policies may be preventing access.',
+        details: `No profile found for user ID ${userId} after update.`,
+        hint: 'Check that your RLS SELECT policy allows admins to view the profiles they have just updated.',
+        code: 'PGRST116' // Not found
       };
       return { data: null, error: notFoundError };
     }
-    return { data: data[0], error: null };
+    
+    return { data, error: null };
   }
 
-
-  async getProfileById(userId: string): Promise<{ data: Profile | null, error: PostgrestError | null }> {
-    return this.supabase.from('profiles').select('*').eq('id', userId).single();
-  }
-
-  async getOpenDtrEntryForUser(userId: string): Promise<{ data: DtrEntry | null, error: PostgrestError | null }> {
-    return this.supabase
-      .from('dtr_entries')
-      .select('*')
-      .eq('user_id', userId)
-      .is('time_out', null)
-      .maybeSingle();
-  }
-  
-  async clockInForUser(userId: string): Promise<{ data: DtrEntry | null, error: PostgrestError | null }> {
-    return this.supabase
-      .from('dtr_entries')
-      .insert({ user_id: userId, time_in: new Date().toISOString() })
-      .select()
-      .single();
-  }
-  
   async getAllOpenDtrEntries(): Promise<{ data: DtrEntry[] | null, error: PostgrestError | null }> {
     return this.supabase
       .from('dtr_entries')
@@ -471,32 +452,28 @@ export class SupabaseService {
   }
 
   async handleQrCodeLogin(userId: string): Promise<{ profile: Profile, dtrEntry: DtrEntry }> {
-    // 1. Fetch profile to ensure the user exists
-    const { data: profile, error: profileError } = await this.getProfileById(userId);
-    if (profileError || !profile) {
-      throw new Error('User profile not found.');
+    // This function now securely calls a database function (RPC) to handle the logic.
+    // The 'handle_qr_scan' function MUST be created in your Supabase SQL Editor.
+    // It runs with elevated privileges on the server, safely bypassing RLS policies.
+    const { data, error } = await this.supabase.rpc('handle_qr_scan', {
+      user_id_input: userId
+    });
+
+    if (error) {
+      // The RPC function will throw an error if the user is not found,
+      // which Supabase forwards. Make the message more user-friendly.
+      if (error.message.includes('User profile not found')) {
+        throw new Error('User profile not found. The QR code may be invalid or the employee may no longer be active.');
+      }
+      throw new Error(`An error occurred during QR scan: ${error.message}`);
     }
 
-    // 2. Check for an open DTR entry for that user
-    const { data: openEntry, error: openEntryError } = await this.getOpenDtrEntryForUser(userId);
-    // We can ignore the "PGRST116" error, which just means no row was found.
-    // Any other error should be thrown.
-    if (openEntryError && (openEntryError as any).code !== 'PGRST116') {
-      throw openEntryError;
+    if (!data || !data.profile || !data.dtrEntry) {
+        throw new Error('Received an invalid response from the server after QR scan.');
     }
-
-    // 3. Decide whether to clock in or clock out
-    if (openEntry) {
-      // User is already clocked in, so clock them out
-      const { data: closedEntry, error: clockOutError } = await this.clockOut(openEntry.id);
-      if (clockOutError) throw clockOutError;
-      return { profile, dtrEntry: closedEntry! };
-    } else {
-      // User is clocked out, so clock them in
-      const { data: newEntry, error: clockInError } = await this.clockInForUser(userId);
-      if (clockInError) throw clockInError;
-      return { profile, dtrEntry: newEntry! };
-    }
+    
+    // The RPC function returns a single JSON object with the expected structure.
+    return data;
   }
   
   // NEW: Delete a DTR entry

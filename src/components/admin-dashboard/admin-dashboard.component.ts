@@ -296,12 +296,12 @@ export class AdminDashboardComponent {
     this.confirmModalConfig.set({
       title: 'Deactivate Employee?',
       message: `Are you sure you want to deactivate ${employee.first_name} ${employee.last_name}? Their data will be saved, but they will be hidden from active lists.`,
-      onConfirm: () => this.handleDeleteEmployee(employee.id),
+      onConfirm: () => this.handleDeactivateEmployee(employee.id),
     });
     this.isConfirmModalVisible.set(true);
   }
 
-  async handleDeleteEmployee(id: string): Promise<void> {
+  async handleDeactivateEmployee(id: string): Promise<void> {
     const { error } = await this.supabaseService.updateUserProfile(id, { status: 'inactive' });
     if (error) {
       alert(`Error deactivating employee: ${error.message}`);
