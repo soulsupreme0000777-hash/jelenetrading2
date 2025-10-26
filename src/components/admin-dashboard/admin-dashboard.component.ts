@@ -554,9 +554,15 @@ export class AdminDashboardComponent {
     this.logoutError.set(null);
     try {
       const { error } = await this.supabaseService.signOut();
-      if (error) throw error;
+      // If there's an error, but it's "Auth session missing!", we can ignore it
+      // because the user is effectively logged out.
+      if (error && error.message !== 'Auth session missing!') {
+        throw error;
+      }
+      // For successful sign out or "session missing" error, navigate to login.
       this.router.navigate(['/login']);
     } catch (e: any) {
+      // Handles any other unexpected errors during sign out.
       this.logoutError.set(`Failed to log out: ${e.message}`);
     }
   }
