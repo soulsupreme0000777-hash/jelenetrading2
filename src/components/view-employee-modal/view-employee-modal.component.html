@@ -1,0 +1,63 @@
+@if (visible() && employee(); as emp) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm" (click)="closeModal()">
+    <div class="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl m-4" (click)="$event.stopPropagation()">
+      
+      <!-- Close Button -->
+      <button (click)="closeModal()" class="absolute -top-2 -right-2 z-10 p-2 bg-red-600 text-white rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+      </button>
+
+      <div class="p-8">
+        <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+          @if(emp.avatar_url) {
+            <img [src]="emp.avatar_url" alt="Avatar" class="h-32 w-32 rounded-full object-cover border-4 border-gray-200 dark:border-gray-700 flex-shrink-0">
+          } @else {
+            <div class="h-32 w-32 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center border-4 border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <svg class="w-16 h-16 text-gray-400 dark:text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>
+            </div>
+          }
+          <div class="text-center sm:text-left">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ emp.first_name }} {{ emp.middle_name }} {{ emp.last_name }}</h2>
+            <p class="text-md text-indigo-600 dark:text-indigo-400 font-semibold">{{ emp.departments?.name ? emp.position : '' }}</p>
+            <span class="mt-1 inline-flex items-center rounded-md px-2 py-1 text-xs font-medium capitalize"
+                [class.bg-blue-100]="emp.role === 'admin'" [class.text-blue-700]="emp.role === 'admin'"
+                [class.dark:bg-blue-900/50]="emp.role === 'admin'" [class.dark:text-blue-300]="emp.role === 'admin'"
+                [class.bg-gray-100]="emp.role === 'employee'" [class.text-gray-600]="emp.role === 'employee'"
+                [class.dark:bg-gray-700]="emp.role === 'employee'" [class.dark:text-gray-200]="emp.role === 'employee'">
+              {{ emp.role }}
+            </span>
+          </div>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6">
+            <div class="sm:col-span-2">
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Email address</dt>
+              <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ emp.email }}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Phone Number</dt>
+              <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ emp.mobile_number }}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Age</dt>
+              <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ emp.age }}</dd>
+            </div>
+             <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Department</dt>
+              <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ emp.departments?.name || emp.position }}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Daily Rate</dt>
+              <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ emp.daily_rate | currency:'PHP':'symbol':'1.2-2' }}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
+              <dd class="mt-1 text-sm text-gray-900 dark:text-white capitalize">{{ emp.status }}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+}

@@ -1,14 +1,21 @@
-/* For the status indicator dot on employee cards */
-.status-dot {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 0.875rem; /* 14px */
-  height: 0.875rem; /* 14px */
-  border-radius: 9999px;
-  border: 2px solid white;
+.chart-bar {
+  transition: all 0.2s ease-in-out;
 }
 
-.dark .status-dot {
-    border-color: #1f2937; /* Tailwind's gray-800 */
+.bar-container {
+  position: relative;
+}
+
+.bar-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+.bar-container:hover .bar-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
 }

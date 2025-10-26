@@ -6,17 +6,10 @@ import { AddDepartmentModalComponent } from '../add-department-modal/add-departm
 import { RunPayrollModalComponent } from '../run-payroll-modal/run-payroll-modal.component';
 import { ConfirmationModalComponent } from '../confirmation-modal/confirmation-modal.component';
 import { DatePipe, CurrencyPipe } from '@angular/common';
+import { ViewEmployeeModalComponent } from '../view-employee-modal/view-employee-modal.component';
+import { IdCardModalComponent } from '../id-card-modal/id-card-modal.component';
 
-type AdminTab = 'employees' | 'dtr' | 'payroll' | 'departments';
-
-interface EnrichedProfile extends Profile {
-  clockStatus: 'Clocked In' | 'Clocked Out';
-  lastEventTimestamp: string | null;
-}
-
-interface DepartmentWithEmployees extends Department {
-  employees: EnrichedProfile[];
-}
+type AdminTab = 'employees' | 'dtr' | 'payroll' | 'departments' | 'analytics';
 
 interface ConfirmModalConfig {
   title: string;
@@ -24,12 +17,36 @@ interface ConfirmModalConfig {
   onConfirm: () => void;
 }
 
+interface AnalyticsReport {
+  absentCount: number;
+  lateCount: number;
+  earlyCount: number;
+  lateByDay: { day: number; count: number }[];
+  maxLateCount: number;
+}
+
+interface DtrGroup {
+  monthYearDisplay: string; // e.g., "October 2025"
+  monthYearValue: string; // e.g., "2025-10" for unique key
+  entries: (DtrEntry & { profiles: Profile })[];
+}
+
+
 @Component({
   selector: 'app-admin-dashboard',
   templateUrl: './admin-dashboard.component.html',
-  styleUrls: ['./admin-dashboard.component.css'],
+  styleUrl: './admin-dashboard.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AddEmployeeModalComponent, AddDepartmentModalComponent, RunPayrollModalComponent, ConfirmationModalComponent, DatePipe, CurrencyPipe],
+  imports: [
+    AddEmployeeModalComponent, 
+    AddDepartmentModalComponent, 
+    RunPayrollModalComponent, 
+    ConfirmationModalComponent, 
+    ViewEmployeeModalComponent,
+    IdCardModalComponent,
+    DatePipe, 
+    CurrencyPipe
+  ],
 })
 export class AdminDashboardComponent {
   private readonly supabaseService = inject(SupabaseService);
@@ -39,8 +56,9 @@ export class AdminDashboardComponent {
   activeTab = signal<AdminTab>('employees');
   isSidebarOpen = signal(false);
 
-  // Employee Search
+  // Employee Search & Sort
   searchTerm = signal<string>('');
+  employeeSortOption = signal<'newest' | 'oldest' | 'lastNameAsc' | 'lastNameDesc'>('newest');
 
   employees = signal<Profile[]>([]);
   employeesLoading = signal(true);
@@ -48,31 +66,98 @@ export class AdminDashboardComponent {
   
   filteredEmployees = computed(() => {
     const term = this.searchTerm().toLowerCase().trim();
-    if (!term) {
-      return this.employees();
-    }
-    return this.employees().filter(emp =>
+    const sortOption = this.employeeSortOption();
+    
+    const filtered = this.employees().filter(emp =>
+      !term || // if no term, return all
+      (emp.employee_id?.toLowerCase().includes(term)) ||
       (emp.first_name?.toLowerCase().includes(term)) ||
+      (emp.middle_name?.toLowerCase().includes(term)) ||
       (emp.last_name?.toLowerCase().includes(term)) ||
-      (emp.email?.toLowerCase().includes(term)) ||
-      (emp.id.toLowerCase().includes(term))
+      (emp.email?.toLowerCase().includes(term))
     );
+
+    return filtered.sort((a, b) => {
+      switch(sortOption) {
+        case 'lastNameAsc':
+          return (a.last_name || '').localeCompare(b.last_name || '');
+        case 'lastNameDesc':
+          return (b.last_name || '').localeCompare(a.last_name || '');
+        case 'oldest':
+          return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+        case 'newest':
+        default:
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+    });
   });
 
   // DTR Signals
   dtrSearchTerm = signal<string>('');
+  dtrSortOption = signal<'newest' | 'oldest' | 'nameAsc' | 'nameDesc'>('newest');
   dtrEntries = signal<(DtrEntry & { profiles: Profile })[]>([]);
   dtrLoading = signal(true);
   dtrError = signal<string | null>(null);
+  openDtrMonths = signal(new Set<string>()); // To track open accordions
   
-  filteredDtrEntries = computed(() => {
+  groupedDtrEntries = computed<DtrGroup[]>(() => {
     const term = this.dtrSearchTerm().toLowerCase().trim();
-    if (!term) {
-      return this.dtrEntries();
+    const sortOption = this.dtrSortOption();
+    const allEntries = this.dtrEntries();
+
+    if (!allEntries.length) {
+      return [];
     }
-    return this.dtrEntries().filter(entry => {
-      const fullName = `${entry.profiles?.first_name || ''} ${entry.profiles?.last_name || ''}`.toLowerCase();
-      return fullName.includes(term);
+
+    // 1. Group entries by month
+    const groups = allEntries.reduce((acc, entry) => {
+      const date = new Date(entry.time_in!);
+      const monthYearValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!acc[monthYearValue]) {
+        acc[monthYearValue] = {
+          monthYearDisplay: date.toLocaleString('default', { month: 'long', year: 'numeric' }),
+          monthYearValue: monthYearValue,
+          entries: []
+        };
+      }
+      acc[monthYearValue].entries.push(entry);
+      return acc;
+    }, {} as Record<string, DtrGroup>);
+
+    // 2. Convert to array and sort groups (newest first)
+    const sortedGroups = Object.values(groups).sort((a, b) => b.monthYearValue.localeCompare(a.monthYearValue));
+
+    // 3. Filter and sort entries within each group
+    return sortedGroups.map(group => {
+      // Filter
+      const filteredEntries = group.entries.filter(entry => {
+        if (!term) return true;
+        const fullName = `${entry.profiles?.first_name || ''} ${entry.profiles?.last_name || ''}`.toLowerCase();
+        return fullName.includes(term);
+      });
+
+      // Sort
+      const sortedAndFilteredEntries = filteredEntries.sort((a, b) => {
+        switch (sortOption) {
+          case 'nameAsc': {
+            const nameA = `${a.profiles?.last_name || ''} ${a.profiles?.first_name || ''}`.trim();
+            const nameB = `${b.profiles?.last_name || ''} ${b.profiles?.first_name || ''}`.trim();
+            return nameA.localeCompare(nameB);
+          }
+          case 'nameDesc': {
+            const nameA = `${a.profiles?.last_name || ''} ${a.profiles?.first_name || ''}`.trim();
+            const nameB = `${b.profiles?.last_name || ''} ${b.profiles?.first_name || ''}`.trim();
+            return nameB.localeCompare(nameA);
+          }
+          case 'oldest':
+            return new Date(a.time_in || 0).getTime() - new Date(b.time_in || 0).getTime();
+          case 'newest':
+          default:
+            return new Date(b.time_in || 0).getTime() - new Date(a.time_in || 0).getTime();
+        }
+      });
+      
+      return { ...group, entries: sortedAndFilteredEntries };
     });
   });
 
@@ -84,17 +169,131 @@ export class AdminDashboardComponent {
   departmentsLoading = signal(true);
   departmentsError = signal<string | null>(null);
   
-  openDtrEntries = signal<DtrEntry[]>([]);
-  openDtrLoading = signal(true);
-  openDtrError = signal<string | null>(null);
-  departmentsWithEmployees = signal<DepartmentWithEmployees[]>([]);
+  // --- Analytics Signals ---
+  analyticsMonth = signal<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM format
+  analyticsLoading = signal(false);
+  analyticsError = signal<string | null>(null);
+  dtrEntriesForAnalytics = signal<DtrEntry[]>([]);
+
+  monthsForSelector = computed(() => {
+    const months = [];
+    const d = new Date();
+    for (let i = 0; i < 12; i++) {
+      const year = d.getFullYear();
+      const month = d.getMonth() + 1;
+      const monthStr = month < 10 ? `0${month}` : month.toString();
+      months.push({
+        value: `${year}-${monthStr}`,
+        label: d.toLocaleString('default', { month: 'long', year: 'numeric' })
+      });
+      d.setMonth(d.getMonth() - 1);
+    }
+    return months;
+  });
   
+  totalEmployees = computed(() => this.employees().length);
+
+  analyticsReport = computed<AnalyticsReport>(() => {
+    const employees = this.employees();
+    const dtrEntries = this.dtrEntriesForAnalytics();
+    const departments = this.departments();
+    const monthStr = this.analyticsMonth();
+
+    if (!employees.length || !monthStr || !departments.length) {
+      return { absentCount: 0, lateCount: 0, earlyCount: 0, lateByDay: [], maxLateCount: 0 };
+    }
+
+    const [year, month] = monthStr.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    const absentEmployees = new Set<string>();
+    const lateEmployees = new Set<string>();
+    const earlyLeavers = new Set<string>();
+    const lateByDay = new Map<number, number>();
+
+    const departmentsMap = new Map(departments.map(d => [d.id, d]));
+
+    const isWeekend = (date: Date) => {
+        const day = date.getDay();
+        return day === 0 || day === 6;
+    };
+
+    // Calculate absent employees (no DTR entries for the entire month)
+    for (const emp of employees) {
+      const hasAnyDtrInMonth = dtrEntries.some(dtr => dtr.user_id === emp.id);
+      if (!hasAnyDtrInMonth) {
+        absentEmployees.add(emp.id);
+      }
+    }
+
+    // Calculate daily metrics for working days
+    for (let day = 1; day <= daysInMonth; day++) {
+        const currentDate = new Date(year, month - 1, day);
+        if (isWeekend(currentDate)) continue;
+
+        lateByDay.set(day, 0); // Initialize count for the working day
+
+        for (const emp of employees) {
+            const empDtrForDay = dtrEntries.filter(dtr => dtr.user_id === emp.id && new Date(dtr.time_in!).getDate() === day);
+
+            if (empDtrForDay.length > 0) {
+              const firstEntry = empDtrForDay[0];
+              const lastEntry = empDtrForDay[empDtrForDay.length - 1];
+
+              // FIX: Use the pre-joined department data from the employee profile.
+              // This is more efficient and fixes a type inference issue with the previous Map-based lookup.
+              const department = emp.departments;
+
+              if (department) {
+                  // Check for lateness on first entry
+                  if (department.work_start_time && firstEntry.time_in) {
+                      const timeIn = new Date(firstEntry.time_in);
+                      const [h, m, s] = department.work_start_time.split(':').map(Number);
+                      const expectedStart = new Date(timeIn);
+                      expectedStart.setHours(h, m, s, 0);
+                      const gracePeriodMs = (department.grace_period_minutes || 0) * 60 * 1000;
+                      if (timeIn.getTime() > expectedStart.getTime() + gracePeriodMs) {
+                          lateEmployees.add(emp.id);
+                          lateByDay.set(day, (lateByDay.get(day) || 0) + 1);
+                      }
+                  }
+                  // Check for early leave on last entry
+                  if (department.work_end_time && lastEntry.time_out) {
+                      const timeOut = new Date(lastEntry.time_out);
+                      const [h, m, s] = department.work_end_time.split(':').map(Number);
+                      const expectedEnd = new Date(timeOut);
+                      expectedEnd.setHours(h, m, s, 0);
+                      if (timeOut.getTime() < expectedEnd.getTime()) {
+                          earlyLeavers.add(emp.id);
+                      }
+                  }
+              }
+            }
+        }
+    }
+    
+    const lateByDayArray = Array.from(lateByDay.entries())
+                                  .map(([day, count]) => ({ day, count }))
+                                  .sort((a, b) => a.day - b.day);
+
+    return {
+        absentCount: absentEmployees.size,
+        lateCount: lateEmployees.size,
+        earlyCount: earlyLeavers.size,
+        lateByDay: lateByDayArray,
+        maxLateCount: Math.max(1, ...lateByDayArray.map(d => d.count)) // use 1 to avoid division by zero
+    };
+  });
+
   isAddEmployeeModalVisible = signal(false);
   isAddDepartmentModalVisible = signal(false);
   isRunPayrollModalVisible = signal(false); 
+  isIdCardModalVisible = signal(false);
+  isViewEmployeeModalVisible = signal(false);
   
   logoutError = signal<string | null>(null);
   
+  selectedEmployee = signal<Profile | null>(null);
   employeeToEdit = signal<Profile | null>(null);
   departmentToEdit = signal<Department | null>(null);
   
@@ -108,23 +307,20 @@ export class AdminDashboardComponent {
       const tab = this.activeTab();
       if (tab === 'dtr' && this.dtrEntries().length === 0) this.loadDtrEntries();
       if (tab === 'payroll' && this.payrolls().length === 0) this.loadPayrolls();
+      if (tab === 'analytics') this.loadDtrForAnalyticsMonth();
     }, { allowSignalWrites: true });
-
+    
     effect(() => {
-      const depts = this.departments();
-      const emps = this.filteredEmployees(); // Use filtered employees
-      const openDtrs = this.openDtrEntries();
-      
-      if (this.departmentsLoading() || this.employeesLoading() || this.openDtrLoading()) return;
-
-      this.processAndGroupData(depts, emps, openDtrs);
-    }, { allowSignalWrites: true });
+      this.analyticsMonth();
+      if(this.activeTab() === 'analytics') {
+          this.loadDtrForAnalyticsMonth();
+      }
+    });
   }
 
   loadInitialData(): void {
     this.loadDepartments();
     this.loadEmployees();
-    this.loadOpenDtrEntries();
   }
   
   onSearchTermChange(event: Event): void {
@@ -135,6 +331,21 @@ export class AdminDashboardComponent {
   onDtrSearchTermChange(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.dtrSearchTerm.set(value);
+  }
+
+  setEmployeeSort(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as 'newest' | 'oldest' | 'lastNameAsc' | 'lastNameDesc';
+    this.employeeSortOption.set(value);
+  }
+
+  setDtrSort(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as 'newest' | 'oldest' | 'nameAsc' | 'nameDesc';
+    this.dtrSortOption.set(value);
+  }
+
+  setAnalyticsMonth(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.analyticsMonth.set(value);
   }
 
   setActiveTab(tab: AdminTab): void {
@@ -166,6 +377,24 @@ export class AdminDashboardComponent {
       this.dtrError.set(`Failed to load DTR entries: ${e.message}`);
     } finally {
       this.dtrLoading.set(false);
+    }
+  }
+  
+  async loadDtrForAnalyticsMonth(): Promise<void> {
+    this.analyticsLoading.set(true);
+    this.analyticsError.set(null);
+    try {
+      const [year, month] = this.analyticsMonth().split('-').map(Number);
+      const startDate = new Date(year, month - 1, 1).toISOString();
+      const endDate = new Date(year, month, 1).toISOString();
+      
+      const { data, error } = await this.supabaseService.getDtrEntriesForDateRange(startDate, endDate);
+      if (error) throw error;
+      this.dtrEntriesForAnalytics.set(data || []);
+    } catch (e: any) {
+      this.analyticsError.set(`Failed to load analytics data: ${e.message}`);
+    } finally {
+      this.analyticsLoading.set(false);
     }
   }
 
@@ -200,47 +429,23 @@ export class AdminDashboardComponent {
       this.departmentsLoading.set(false);
     }
   }
-  
-  async loadOpenDtrEntries(): Promise<void> {
-    this.openDtrLoading.set(true);
-    this.openDtrError.set(null);
-    try {
-      const { data, error } = await this.supabaseService.getAllOpenDtrEntries();
-      if (error) throw error;
-      this.openDtrEntries.set(data || []);
-    } catch (e: any) {
-      this.openDtrError.set(`Failed to load clock-in status: ${e.message}`);
-    } finally {
-      this.openDtrLoading.set(false);
-    }
-  }
 
-  processAndGroupData(departments: Department[], employees: Profile[], openDtrEntries: DtrEntry[]): void {
-    const openDtrMap = new Map<string, DtrEntry>(
-      openDtrEntries.map(dtr => [dtr.user_id, dtr])
-    );
-
-    const enrichedEmployees = employees.map(emp => {
-      const openDtr = openDtrMap.get(emp.id);
-      return {
-        ...emp,
-        clockStatus: openDtr ? 'Clocked In' : 'Clocked Out',
-        lastEventTimestamp: openDtr ? openDtr.time_in : null,
-      } as EnrichedProfile;
-    });
-
-    const groupedData = departments.map(dept => ({
-      ...dept,
-      employees: enrichedEmployees.filter(emp => emp.position === dept.name)
-    }));
-    
-    this.departmentsWithEmployees.set(groupedData);
-  }
-  
   refreshAllData(): void {
     this.loadInitialData();
   }
   
+  toggleDtrMonth(monthYearValue: string): void {
+    this.openDtrMonths.update(currentSet => {
+        const newSet = new Set(currentSet);
+        if (newSet.has(monthYearValue)) {
+            newSet.delete(monthYearValue);
+        } else {
+            newSet.add(monthYearValue);
+        }
+        return newSet;
+    });
+  }
+
   // --- Modal Management ---
   openAddEmployeeModal(): void {
     this.employeeToEdit.set(null);
@@ -250,6 +455,16 @@ export class AdminDashboardComponent {
   openEditEmployeeModal(employee: Profile): void {
     this.employeeToEdit.set(employee);
     this.isAddEmployeeModalVisible.set(true);
+  }
+  
+  openViewEmployeeModal(employee: Profile): void {
+    this.selectedEmployee.set(employee);
+    this.isViewEmployeeModalVisible.set(true);
+  }
+  
+  openIdCardModal(employee: Profile): void {
+    this.selectedEmployee.set(employee);
+    this.isIdCardModalVisible.set(true);
   }
 
   closeEmployeeModal(): void {
@@ -310,74 +525,29 @@ export class AdminDashboardComponent {
     }
     this.isConfirmModalVisible.set(false);
   }
+  
+  async onPayrollStatusChange(payrollId: number, event: Event): Promise<void> {
+    const newStatus = (event.target as HTMLSelectElement).value as 'Paid' | 'Delayed' | 'Unpaid';
 
-  openDeleteDtrConfirmation(entry: DtrEntry & { profiles: Profile }): void {
-    const employeeName = `${entry.profiles?.first_name || 'Unknown'} ${entry.profiles?.last_name || 'Employee'}`;
-    const timeIn = new Date(entry.time_in).toLocaleString();
-    this.confirmModalConfig.set({
-      title: 'Delete DTR Log?',
-      message: `Are you sure you want to delete the time log for ${employeeName} (Clock-in: ${timeIn})? This action is permanent.`,
-      onConfirm: () => this.handleDeleteDtrEntry(entry.id),
-    });
-    this.isConfirmModalVisible.set(true);
-  }
+    const originalPayrolls = this.payrolls();
+    const payrollToUpdate = originalPayrolls.find(p => p.id === payrollId);
+    if (!payrollToUpdate) return;
 
-  async handleDeleteDtrEntry(id: number): Promise<void> {
-    const { error } = await this.supabaseService.deleteDtrEntry(id);
-    if (error) {
-      alert(`Error deleting DTR log: ${error.message}`);
-    } else {
-      this.loadDtrEntries(); // Refresh the list
+    // 1. Optimistically update UI
+    this.payrolls.update(payrolls =>
+      payrolls.map(p => (p.id === payrollId ? { ...p, status: newStatus } : p))
+    );
+
+    try {
+      // 2. Make API call
+      const { error } = await this.supabaseService.updatePayrollStatus(payrollId, newStatus);
+      if (error) throw error;
+      // Success: UI is already updated, do nothing.
+    } catch (error: any) {
+      // 3. Revert on failure
+      alert(`Failed to update status: ${error.message}. Reverting change.`);
+      this.payrolls.set(originalPayrolls);
     }
-    this.isConfirmModalVisible.set(false);
-  }
-
-  exportDtrToCsv(): void {
-    const entries = this.filteredDtrEntries();
-    if (entries.length === 0) {
-      alert('No DTR data to export.');
-      return;
-    }
-
-    const headers = ['Employee Name', 'Time In', 'Time Out', 'Duration (Hours)'];
-    
-    const formatDate = (dateString: string | null | undefined): string => {
-        if (!dateString) return '';
-        const d = new Date(dateString);
-        const pad = (num: number) => num.toString().padStart(2, '0');
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    };
-    
-    const csvRows = entries.map(entry => {
-      const escapeCsv = (str: string | undefined | null) => `"${(str || '').replace(/"/g, '""')}"`;
-
-      const name = escapeCsv(`${entry.profiles?.first_name || ''} ${entry.profiles?.last_name || ''}`);
-      const timeIn = escapeCsv(formatDate(entry.time_in));
-      const timeOut = escapeCsv(formatDate(entry.time_out));
-      
-      let duration = '0.00';
-      if (entry.time_in && entry.time_out) {
-        const start = new Date(entry.time_in).getTime();
-        const end = new Date(entry.time_out).getTime();
-        const hours = (end - start) / (1000 * 60 * 60);
-        duration = hours.toFixed(2);
-      }
-
-      return [name, timeIn, timeOut, duration].join(',');
-    });
-
-    const csvContent = [headers.join(','), ...csvRows].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    const dateStr = new Date().toISOString().slice(0, 10);
-    link.setAttribute('download', `dtr-logs-${dateStr}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   }
 
   async onLogout(): Promise<void> {

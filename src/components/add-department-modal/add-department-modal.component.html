@@ -1,0 +1,75 @@
+@if (visible()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm" (click)="closeModal()">
+    <div class="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl m-4" (click)="$event.stopPropagation()">
+      <button (click)="closeModal()" class="absolute -top-2 -right-2 z-10 p-2 bg-red-600 text-white rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+      </button>
+
+      @if (modalState() === 'form') {
+        <div class="p-8 space-y-6">
+          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ isEditMode() ? 'Edit' : 'Add New' }} Department</h2>
+
+          @if (errorMessage()) {
+            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
+              <p class="font-bold">Error</p>
+              <p>{{ errorMessage() }}</p>
+            </div>
+          }
+
+          <form class="space-y-4" (ngSubmit)="onSubmit()">
+            <div>
+              <label for="deptName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Department Name</label>
+              <input 
+                type="text" 
+                id="deptName"
+                [ngModel]="departmentName()" 
+                (ngModelChange)="departmentName.set($event)" 
+                name="departmentName" 
+                required 
+                placeholder="e.g., Sales, Engineering"
+                class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <div>
+                <label for="startTime" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Work Start Time</label>
+                <input type="time" id="startTime" [ngModel]="workStartTime()" (ngModelChange)="workStartTime.set($event)" name="workStartTime" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+              </div>
+              <div>
+                <label for="endTime" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Work End Time</label>
+                <input type="time" id="endTime" [ngModel]="workEndTime()" (ngModelChange)="workEndTime.set($event)" name="workEndTime" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label for="gracePeriod" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Grace Period (minutes)</label>
+                <input type="number" id="gracePeriod" [ngModel]="gracePeriodMinutes()" (ngModelChange)="gracePeriodMinutes.set($event ? +$event : null)" name="gracePeriod" required min="0" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+              </div>
+              <div>
+                <label for="deductionRate" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Deduction Rate per Minute (PHP)</label>
+                <input type="number" id="deductionRate" [ngModel]="deductionRatePerMinute()" (ngModelChange)="deductionRatePerMinute.set($event ? +$event : null)" name="deductionRate" required min="0" step="0.01" placeholder="e.g., 1.50" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+              </div>
+            </div>
+
+            <div class="pt-4">
+              <button 
+                type="submit" 
+                [disabled]="!isFormValid()"
+                class="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors duration-300">
+                {{ isEditMode() ? 'Save Changes' : 'Create Department' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      }
+
+      @if (modalState() === 'loading') {
+        <div class="p-16 flex flex-col items-center justify-center space-y-4">
+          <svg class="animate-spin h-12 w-12 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          <p class="text-xl font-semibold text-gray-700 dark:text-gray-300">Saving Department...</p>
+        </div>
+      }
+    </div>
+  </div>
+}

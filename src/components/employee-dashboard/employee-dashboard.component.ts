@@ -1,10 +1,18 @@
 import { Component, ChangeDetectionStrategy, inject, computed, signal, effect } from '@angular/core';
 import { Router } from '@angular/router';
-import { SupabaseService, DtrEntry, Profile, Payroll } from '../../services/supabase.service';
+import { SupabaseService, DtrEntry, Payroll, Profile } from '../../services/supabase.service';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, CurrencyPipe } from '@angular/common';
 
-type EmployeeTab = 'dtr' | 'profile' | 'payroll';
+type EmployeeTab = 'profile' | 'dtr' | 'payroll' | 'analytics';
+
+interface AnalyticsReport {
+  onTimeCount: number;
+  lateCount: number;
+  earlyLeaveCount: number;
+  totalMonthlySalary: number;
+  monthName: string;
+}
 
 @Component({
   selector: 'app-employee-dashboard',
@@ -16,52 +24,37 @@ export class EmployeeDashboardComponent {
   private readonly supabaseService = inject(SupabaseService);
   private readonly router: Router = inject(Router);
 
-  user = this.supabaseService.currentUser;
-  userEmail = computed(() => this.user()?.email || 'Employee');
+  userProfile = this.supabaseService.currentUserProfile;
+  userEmail = computed(() => this.userProfile()?.email || 'Employee');
   
-  activeTab = signal<EmployeeTab>('dtr');
+  activeTab = signal<EmployeeTab>('profile');
 
   // Signals for DTR
   dtrHistory = signal<DtrEntry[]>([]);
   dtrLoading = signal(true);
   dtrError = signal<string | null>(null);
-  clockingInProgress = signal(false);
-  openDtrEntry = signal<DtrEntry | null>(null);
-  isClockedIn = computed(() => !!this.openDtrEntry());
-
-  // Signals for Profile
-  profile = signal<Profile | null>(null);
-  profileLoading = signal(true);
-  profileError = signal<string | null>(null);
-  profileMessage = signal<{type: 'success' | 'error', text: string} | null>(null);
-  profileUpdateInProgress = signal(false);
   
-  // Writable signals for profile form
-  firstName = signal('');
-  lastName = signal('');
-
   // Signals for Payroll
   payrolls = signal<Payroll[]>([]);
   payrollsLoading = signal(true);
   payrollsError = signal<string | null>(null);
   logoutError = signal<string | null>(null);
+  expandedPayrollId = signal<number | null>(null);
+  
+  // Signals for Analytics
+  analyticsReport = signal<AnalyticsReport | null>(null);
+  analyticsLoading = signal(false);
 
   constructor() {
     this.loadDtrData();
-    this.loadProfileData();
-
-    effect(() => {
-      // When profile data is loaded, populate the form signals
-      if (this.profile()) {
-        this.firstName.set(this.profile()?.first_name || '');
-        this.lastName.set(this.profile()?.last_name || '');
-      }
-    });
 
     effect(() => {
       const currentTab = this.activeTab();
       if (currentTab === 'payroll' && this.payrolls().length === 0) {
         this.loadPayrolls();
+      }
+      if (currentTab === 'analytics' && !this.analyticsReport()) {
+        this.calculateAnalytics();
       }
     });
   }
@@ -74,10 +67,6 @@ export class EmployeeDashboardComponent {
     this.dtrLoading.set(true);
     this.dtrError.set(null);
     try {
-      const { data: openEntry, error: openEntryError } = await this.supabaseService.getOpenDtrEntry();
-      if (openEntryError && (openEntryError as any).code !== 'PGRST116') throw openEntryError; // Ignore "exact one row" error
-      this.openDtrEntry.set(openEntry);
-
       const { data: history, error: historyError } = await this.supabaseService.getDtrHistoryForCurrentUser();
       if (historyError) throw historyError;
       this.dtrHistory.set(history as DtrEntry[]);
@@ -86,20 +75,6 @@ export class EmployeeDashboardComponent {
       this.dtrError.set(`Failed to load time data: ${e.message}`);
     } finally {
       this.dtrLoading.set(false);
-    }
-  }
-
-  async loadProfileData(): Promise<void> {
-    this.profileLoading.set(true);
-    this.profileError.set(null);
-    try {
-      const { data, error } = await this.supabaseService.getProfileForCurrentUser();
-      if (error) throw error;
-      this.profile.set(data as Profile);
-    } catch (e: any) {
-      this.profileError.set(`Failed to load profile: ${e.message}`);
-    } finally {
-      this.profileLoading.set(false);
     }
   }
 
@@ -116,49 +91,95 @@ export class EmployeeDashboardComponent {
       this.payrollsLoading.set(false);
     }
   }
+  
+  calculateAnalytics(): void {
+    this.analyticsLoading.set(true);
 
-  async onUpdateProfile(): Promise<void> {
-    this.profileUpdateInProgress.set(true);
-    this.profileMessage.set(null);
-    try {
-      const { data, error } = await this.supabaseService.updateProfileForCurrentUser({
-        first_name: this.firstName(),
-        last_name: this.lastName()
-      });
-      if (error) {
-        console.error('Error updating current user profile:', error);
-        throw new Error(error.message);
-      }
-      this.profile.set(data as Profile); // Update local state with returned data
-      this.profileMessage.set({ type: 'success', text: 'Profile updated successfully!' });
-    } catch (e: any) {
-      this.profileMessage.set({ type: 'error', text: `Failed to update profile: ${e.message}` });
-    } finally {
-      this.profileUpdateInProgress.set(false);
+    const profile = this.userProfile();
+    const dtrHistory = this.dtrHistory();
+
+    if (!profile || !profile.departments || !profile.daily_rate) {
+        this.analyticsLoading.set(false);
+        // Set report to null to show an error message in the template
+        this.analyticsReport.set(null);
+        return;
     }
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const currentMonthDtr = dtrHistory.filter(entry => {
+        const entryDate = new Date(entry.time_in!);
+        return entryDate.getFullYear() === year && entryDate.getMonth() === month;
+    });
+
+    let onTimeCount = 0;
+    let lateCount = 0;
+    let earlyLeaveCount = 0;
+
+    const dtrByDay = currentMonthDtr.reduce((acc, dtr) => {
+        if (dtr.time_in) {
+            const day = dtr.time_in.substring(0, 10);
+            if (!acc[day]) acc[day] = [];
+            acc[day].push(dtr);
+        }
+        return acc;
+    }, {} as Record<string, DtrEntry[]>);
+    
+    const department = profile.departments;
+    
+    Object.values(dtrByDay).forEach((dailyEntries: DtrEntry[]) => {
+        dailyEntries.sort((a, b) => new Date(a.time_in!).getTime() - new Date(b.time_in!).getTime());
+        const firstEntry = dailyEntries[0];
+        const lastEntry = dailyEntries[dailyEntries.length - 1];
+
+        // Lateness check
+        if (department.work_start_time && firstEntry.time_in) {
+            const timeIn = new Date(firstEntry.time_in);
+            const [h, m, s] = department.work_start_time.split(':').map(Number);
+            const expectedStart = new Date(timeIn);
+            expectedStart.setHours(h, m, s, 0);
+            const gracePeriodMs = (department.grace_period_minutes || 0) * 60 * 1000;
+            if (timeIn.getTime() > expectedStart.getTime() + gracePeriodMs) {
+                lateCount++;
+            } else {
+                onTimeCount++;
+            }
+        } else {
+          onTimeCount++; // If no start time is defined, count as on-time
+        }
+
+        // Early leave check
+        if (department.work_end_time && lastEntry.time_out) {
+            const timeOut = new Date(lastEntry.time_out);
+            const [h, m, s] = department.work_end_time.split(':').map(Number);
+            const expectedEnd = new Date(timeOut);
+            expectedEnd.setHours(h, m, s, 0);
+            if (timeOut.getTime() < expectedEnd.getTime()) {
+                earlyLeaveCount++;
+            }
+        }
+    });
+
+    const daysWorked = Object.keys(dtrByDay).length;
+    const totalMonthlySalary = daysWorked * profile.daily_rate;
+
+    this.analyticsReport.set({
+        onTimeCount,
+        lateCount,
+        earlyLeaveCount,
+        totalMonthlySalary,
+        monthName
+    });
+    this.analyticsLoading.set(false);
   }
 
-  async toggleClock(): Promise<void> {
-    this.clockingInProgress.set(true);
-    this.dtrError.set(null);
-
-    try {
-      if (this.isClockedIn()) {
-        const entryToClose = this.openDtrEntry();
-        if (entryToClose?.id) {
-          await this.supabaseService.clockOut(entryToClose.id);
-          this.openDtrEntry.set(null);
-        }
-      } else {
-        const { data } = await this.supabaseService.clockIn();
-        this.openDtrEntry.set(data as DtrEntry);
-      }
-      await this.loadDtrData();
-    } catch (e: any) {
-       this.dtrError.set(`An error occurred: ${e.message}`);
-    } finally {
-      this.clockingInProgress.set(false);
-    }
+  togglePayrollDetails(payrollId: number): void {
+    this.expandedPayrollId.update(currentId => 
+      currentId === payrollId ? null : payrollId
+    );
   }
 
   async onLogout(): Promise<void> {

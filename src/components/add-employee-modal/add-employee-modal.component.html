@@ -37,9 +37,17 @@
           </div>
           
           <form class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4" (ngSubmit)="onSubmit()">
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Employee ID</label>
+              <input type="text" [ngModel]="employeeId()" (ngModelChange)="employeeId.set($event)" name="employeeId" required placeholder="e.g., ATC-00158" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+            </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">First Name</label>
               <input type="text" [ngModel]="firstName()" (ngModelChange)="firstName.set($event)" name="firstName" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+            </div>
+             <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Middle Name</label>
+              <input type="text" [ngModel]="middleName()" (ngModelChange)="middleName.set($event)" name="middleName" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Last Name</label>
@@ -76,7 +84,7 @@
             }
             
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Department / Position</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
               <select name="department" required [ngModel]="selectedDepartmentId()" (ngModelChange)="selectedDepartmentId.set($event)" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
                 <option value="" disabled>Select a department</option>
                 @for (dept of departments(); track dept.id) {
@@ -85,8 +93,13 @@
               </select>
             </div>
             <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Position</label>
+                <input type="text" [ngModel]="position()" (ngModelChange)="position.set($event)" name="position" required placeholder="e.g., Sales Manager" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+            </div>
+
+            <div class="md:col-span-2">
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Daily Rate (PHP)</label>
-              <input type="number" [ngModel]="hourlyRate()" name="hourlyRate" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200 cursor-not-allowed" min="0" step="0.01" disabled>
+              <input type="number" [ngModel]="dailyRate()" (ngModelChange)="dailyRate.set($event ? +$event : null)" name="dailyRate" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200" placeholder="e.g., 500.00" min="0" step="0.01">
             </div>
             <div class="md:col-span-2 pt-4">
               <button type="submit" [disabled]="!isFormValid()" class="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors duration-300">

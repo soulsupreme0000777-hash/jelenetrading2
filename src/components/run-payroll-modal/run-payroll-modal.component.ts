@@ -1,189 +1,266 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, inject, computed, effect } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CurrencyPipe, DecimalPipe } from '@angular/common';
-import { SupabaseService, Profile, DtrEntry, PayrollPreviewItem, Payroll, Department } from '../../services/supabase.service';
+import { SupabaseService, Profile, DtrEntry, Payroll, Department } from '../../services/supabase.service';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 
-type ModalStep = 'period' | 'deductions' | 'loading' | 'success' | 'error';
+interface PayrollPreview {
+  employeeId: string;
+  employeeName: string;
+  daysWorked: number;
+  totalHours: number;
+  dailyRate: number;
+  grossPay: number;
+  totalMinutesLate: number;
+  totalMinutesEarly: number;
+  latenessDeductions: number;
+  earlyDepartureDeductions: number;
+  manualDeductions: number;
+  netPay: number;
+  selected: boolean;
+}
+
+type ModalState = 'config' | 'preview' | 'loading' | 'success' | 'error';
 
 @Component({
   selector: 'app-run-payroll-modal',
   templateUrl: './run-payroll-modal.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, CurrencyPipe, DecimalPipe],
+  imports: [FormsModule, CurrencyPipe, DatePipe],
 })
 export class RunPayrollModalComponent {
   visible = input.required<boolean>();
   departments = input.required<Department[]>();
   close = output<void>();
   payrollRun = output<void>();
-
-  private readonly supabaseService = inject(SupabaseService);
-
-  modalStep = signal<ModalStep>('period');
-  startDate = signal('');
-  endDate = signal('');
   
-  payrollPreview = signal<PayrollPreviewItem[]>([]);
+  private readonly supabaseService = inject(SupabaseService);
+  
+  modalState = signal<ModalState>('config');
   errorMessage = signal<string | null>(null);
-  isCalculating = signal(false);
 
-  isPeriodValid = computed(() => this.startDate() && this.endDate() && new Date(this.startDate()) <= new Date(this.endDate()));
+  // Config State
+  startDate = signal<string>('');
+  endDate = signal<string>('');
+  
+  // Preview State
+  payrollPreviews = signal<PayrollPreview[]>([]);
+  totalPayrollCost = computed(() => this.payrollPreviews().filter(p => p.selected).reduce((sum, p) => sum + p.netPay, 0));
+  selectedEmployeesCount = computed(() => this.payrollPreviews().filter(p => p.selected).length);
+  isAllSelected = computed(() => this.payrollPreviews().length > 0 && this.payrollPreviews().every(p => p.selected));
 
-  constructor() {
-    effect(() => {
-      if (this.visible()) {
-        this.resetState();
-      }
-    });
-  }
+  isConfigValid = computed(() => {
+    return this.startDate() && this.endDate() && this.startDate() <= this.endDate();
+  });
 
-  async calculatePreview(): Promise<void> {
-    if (!this.isPeriodValid()) {
-      this.errorMessage.set('Please select a valid date range.');
+  async onGeneratePreview(): Promise<void> {
+    if (!this.isConfigValid()) {
+      this.errorMessage.set('Please select a valid start and end date.');
       return;
     }
-    this.isCalculating.set(true);
+    
+    this.modalState.set('loading');
     this.errorMessage.set(null);
-    this.modalStep.set('loading');
-
+    this.payrollPreviews.set([]);
+    
     try {
-      const { data: dtrEntries, error } = await this.supabaseService.getDtrEntriesForPeriod(this.startDate(), this.endDate());
-      if (error) throw error;
-      if (!dtrEntries || dtrEntries.length === 0) {
-        this.errorMessage.set('No completed DTR entries found for the selected period.');
-        this.modalStep.set('period');
+      const start = new Date(this.startDate()).toISOString();
+      const end = new Date(this.endDate());
+      end.setDate(end.getDate() + 1); // Include the whole end day
+      const endISO = end.toISOString();
+      
+      const { data: employees, error: empError } = await this.supabaseService.getAllUsersWithProfiles();
+      if (empError) throw empError;
+      
+      const { data: dtrEntries, error: dtrError } = await this.supabaseService.getDtrEntriesForDateRange(start, endISO);
+      if (dtrError) throw dtrError;
+
+      if (!employees || employees.length === 0) {
+        throw new Error('No active employees found to run payroll for.');
+      }
+      
+      const previews: PayrollPreview[] = [];
+      
+      for (const emp of employees) {
+        if (!emp.id || !emp.daily_rate) continue;
+        
+        const empDtr = dtrEntries?.filter(d => d.user_id === emp.id) || [];
+        if (empDtr.length === 0) continue;
+        
+        const department = emp.departments;
+
+        let totalHours = 0;
+        
+        const dtrByDay = empDtr.reduce((acc, dtr) => {
+          if (dtr.time_in) {
+            const day = dtr.time_in.substring(0, 10);
+            if (!acc[day]) acc[day] = [];
+            acc[day].push(dtr);
+          }
+          return acc;
+        }, {} as Record<string, DtrEntry[]>);
+
+        const daysWorked = Object.keys(dtrByDay).length;
+        if (daysWorked === 0) continue;
+
+        const grossPay = daysWorked * emp.daily_rate;
+        let totalMinutesLate = 0;
+        let totalMinutesEarly = 0;
+        
+        Object.values(dtrByDay).forEach((dailyEntries: DtrEntry[]) => {
+          dailyEntries.sort((a, b) => new Date(a.time_in!).getTime() - new Date(b.time_in!).getTime());
+          const firstEntry = dailyEntries[0];
+          const lastEntry = dailyEntries[dailyEntries.length - 1];
+
+          dailyEntries.forEach(dtr => {
+            if (dtr.time_in && dtr.time_out) {
+              totalHours += (new Date(dtr.time_out).getTime() - new Date(dtr.time_in).getTime()) / (1000 * 60 * 60);
+            }
+          });
+
+          if (department?.work_start_time && firstEntry.time_in) {
+            const timeIn = new Date(firstEntry.time_in);
+            const [h, m, s] = department.work_start_time.split(':').map(Number);
+            const expectedStart = new Date(timeIn);
+            expectedStart.setHours(h, m, s, 0);
+            const gracePeriodMs = (department.grace_period_minutes || 0) * 60 * 1000;
+            if (timeIn.getTime() > expectedStart.getTime() + gracePeriodMs) {
+              const lateDiffMs = timeIn.getTime() - expectedStart.getTime();
+              totalMinutesLate += Math.round(lateDiffMs / (1000 * 60));
+            }
+          }
+          
+          if (department?.work_end_time && lastEntry.time_out) {
+            const timeOut = new Date(lastEntry.time_out);
+            const [h, m, s] = department.work_end_time.split(':').map(Number);
+            const expectedEnd = new Date(timeOut);
+            expectedEnd.setHours(h, m, s, 0);
+            if (timeOut.getTime() < expectedEnd.getTime()) {
+              const earlyDiffMs = expectedEnd.getTime() - timeOut.getTime();
+              totalMinutesEarly += Math.round(earlyDiffMs / (1000 * 60));
+            }
+          }
+        });
+
+        const deductionRate = department?.deduction_rate_per_minute || 0;
+        const latenessDeductions = totalMinutesLate * deductionRate;
+        const earlyDepartureDeductions = totalMinutesEarly * deductionRate;
+        const netPay = grossPay - latenessDeductions - earlyDepartureDeductions;
+        
+        previews.push({
+          employeeId: emp.id,
+          employeeName: `${emp.first_name} ${emp.last_name}`,
+          daysWorked,
+          totalHours: parseFloat(totalHours.toFixed(2)),
+          dailyRate: emp.daily_rate,
+          grossPay: parseFloat(grossPay.toFixed(2)),
+          totalMinutesLate,
+          totalMinutesEarly,
+          latenessDeductions: parseFloat(latenessDeductions.toFixed(2)),
+          earlyDepartureDeductions: parseFloat(earlyDepartureDeductions.toFixed(2)),
+          manualDeductions: 0,
+          netPay: parseFloat(netPay.toFixed(2)),
+          selected: true,
+        });
+      }
+      
+      if (previews.length === 0) {
+        this.errorMessage.set('No work hours recorded for any employee in the selected period.');
+        this.modalState.set('config');
         return;
       }
       
-      this.processDtrEntries(dtrEntries);
-      this.modalStep.set('deductions');
+      this.payrollPreviews.set(previews);
+      this.modalState.set('preview');
 
-    } catch (e: any) {
-      this.errorMessage.set(e.message);
-      this.modalStep.set('period');
-    } finally {
-      this.isCalculating.set(false);
+    } catch (error: any) {
+      this.errorMessage.set(error.message || 'Failed to generate payroll preview.');
+      this.modalState.set('config');
     }
   }
+  
+  toggleSelectAll(): void {
+    const newSelectedState = !this.isAllSelected();
+    this.payrollPreviews.update(previews => 
+        previews.map(p => ({ ...p, selected: newSelectedState }))
+    );
+  }
 
-  private processDtrEntries(entries: (DtrEntry & { profiles: Profile })[]): void {
-    const departmentMap = new Map<string, Department>(this.departments().map(dept => [dept.name, dept]));
-    const userPayrollData = new Map<string, { profile: Profile, totalMillis: number, latenessDeduction: number }>();
+  toggleEmployeeSelection(employeeId: string): void {
+      this.payrollPreviews.update(previews =>
+          previews.map(p => p.employeeId === employeeId ? { ...p, selected: !p.selected } : p)
+      );
+  }
 
-    for (const entry of entries) {
-      if (!entry.profiles || !entry.time_out || !entry.profiles.position) continue;
-
-      const department = departmentMap.get(entry.profiles.position);
-      const timeIn = new Date(entry.time_in);
-      const timeOut = new Date(entry.time_out);
-      const durationMillis = timeOut.getTime() - timeIn.getTime();
-
-      let currentLatenessDeduction = 0;
-      if (department && department.work_start_time) {
-        const [hours, minutes] = department.work_start_time.split(':').map(Number);
-        
-        const workStartTime = new Date(timeIn);
-        workStartTime.setHours(hours, minutes, 0, 0);
-
-        const minutesLate = (timeIn.getTime() - workStartTime.getTime()) / (1000 * 60);
-
-        if (minutesLate > department.grace_period_minutes) {
-          const chargeableMinutes = minutesLate - department.grace_period_minutes;
-          currentLatenessDeduction = chargeableMinutes * department.lateness_deduction_per_minute;
+  updateManualDeduction(employeeId: string, event: Event): void {
+    const newManualDeduction = parseFloat((event.target as HTMLInputElement).value);
+    if (isNaN(newManualDeduction) || newManualDeduction < 0) return;
+    
+    this.payrollPreviews.update(previews => 
+      previews.map(p => {
+        if (p.employeeId === employeeId) {
+          const netPay = p.grossPay - p.latenessDeductions - p.earlyDepartureDeductions - newManualDeduction;
+          return { ...p, manualDeductions: newManualDeduction, netPay: parseFloat(netPay.toFixed(2)) };
         }
-      }
-
-      const existing = userPayrollData.get(entry.user_id);
-      if (existing) {
-        existing.totalMillis += durationMillis;
-        existing.latenessDeduction += currentLatenessDeduction;
-      } else {
-        userPayrollData.set(entry.user_id, { 
-          profile: entry.profiles, 
-          totalMillis: durationMillis,
-          latenessDeduction: currentLatenessDeduction 
-        });
-      }
-    }
-
-    const preview: PayrollPreviewItem[] = [];
-    for (const [userId, data] of userPayrollData.entries()) {
-      const totalHours = data.totalMillis / (1000 * 60 * 60);
-      const grossPay = totalHours * (data.profile.hourly_rate || 0);
-      const autoDeductions = data.latenessDeduction;
-      
-      preview.push({
-        user_id: userId,
-        profile: data.profile,
-        total_hours: totalHours,
-        gross_pay: grossPay,
-        auto_lateness_deductions: autoDeductions,
-        deductions: Math.max(0, autoDeductions), // Initialize with auto deductions, ensure non-negative
-        net_pay: grossPay - Math.max(0, autoDeductions),
-      });
-    }
-
-    this.payrollPreview.set(preview);
+        return p;
+      })
+    );
   }
 
-  onDeductionChange(userId: string, deductions: number | null): void {
-    this.payrollPreview.update(currentPreview => {
-      return currentPreview.map(item => {
-        if (item.user_id === userId) {
-          const newDeductions = deductions ?? 0;
-          return {
-            ...item,
-            deductions: newDeductions,
-            net_pay: item.gross_pay - newDeductions,
-          };
-        }
-        return item;
-      });
-    });
-  }
-
-  async onFinalize(): Promise<void> {
-    this.isCalculating.set(true);
+  async onConfirmRunPayroll(): Promise<void> {
+    this.modalState.set('loading');
     this.errorMessage.set(null);
-    this.modalStep.set('loading');
-
+    
     try {
-      const payrollsToCreate: Omit<Payroll, 'id' | 'profiles'>[] = this.payrollPreview().map(item => ({
-        user_id: item.user_id,
+      const selectedPayrolls = this.payrollPreviews().filter(p => p.selected);
+      
+      const payrollsToInsert: Omit<Payroll, 'id' | 'created_at' | 'status'>[] = selectedPayrolls.map(p => ({
+        user_id: p.employeeId,
         pay_period_start: new Date(this.startDate()).toISOString(),
         pay_period_end: new Date(this.endDate()).toISOString(),
-        total_hours: item.total_hours,
-        gross_pay: item.gross_pay,
-        deductions: item.deductions,
-        net_pay: item.net_pay,
-        status: 'paid', // Or 'processing' if there is an approval step
+        total_hours: p.totalHours,
+        gross_pay: p.grossPay,
+        lateness_minutes: p.totalMinutesLate,
+        early_departure_minutes: p.totalMinutesEarly,
+        lateness_deductions: p.latenessDeductions,
+        early_departure_deductions: p.earlyDepartureDeductions,
+        manual_deductions: p.manualDeductions,
+        net_pay: p.netPay,
       }));
       
-      const { error } = await this.supabaseService.finalizePayrolls(payrollsToCreate);
+      if (payrollsToInsert.length === 0) {
+        this.errorMessage.set('No employees selected to run payroll for.');
+        this.modalState.set('preview');
+        return;
+      }
+      
+      const { error } = await this.supabaseService.runPayrollForEmployees(payrollsToInsert);
       if (error) throw error;
       
-      this.modalStep.set('success');
+      this.modalState.set('success');
       this.payrollRun.emit();
-
-    } catch (e: any) {
-      this.errorMessage.set(e.message);
-      this.modalStep.set('error');
-    } finally {
-      this.isCalculating.set(false);
+      
+    } catch (error: any) {
+      this.errorMessage.set(error.message || 'Failed to run payroll.');
+      this.modalState.set('preview');
     }
+  }
+
+  goBackToConfig(): void {
+    this.modalState.set('config');
+    this.errorMessage.set(null);
+    this.payrollPreviews.set([]);
   }
 
   closeModal(): void {
+    this.resetState();
     this.close.emit();
   }
 
   private resetState(): void {
-    this.modalStep.set('period');
+    this.modalState.set('config');
     this.errorMessage.set(null);
-    const today = new Date().toISOString().split('T')[0];
-    this.startDate.set(today);
-    this.endDate.set(today);
-    this.payrollPreview.set([]);
-    this.isCalculating.set(false);
+    this.startDate.set('');
+    this.endDate.set('');
+    this.payrollPreviews.set([]);
   }
 }

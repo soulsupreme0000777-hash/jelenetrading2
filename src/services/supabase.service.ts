@@ -1,57 +1,43 @@
-
-
-
-import { Injectable, signal, inject, computed } from '@angular/core';
-import { Router } from '@angular/router';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import {
   createClient,
   SupabaseClient,
   User,
   AuthError,
   PostgrestError,
-  Session,
+  AuthTokenResponse,
+  SignInWithPasswordCredentials,
 } from '@supabase/supabase-js';
 import { environment } from '../environments/environment';
+import { Router } from '@angular/router';
 
-export interface NewUserPayload {
-  email: string;
-  password: string;
-  imageFile: File | null;
-  profileData: {
-    first_name: string | null;
-    last_name: string | null;
-    age: number | null;
-    mobile_number: string | null;
-    position: string | null;
-    hourly_rate: number | null;
-    role: 'superadmin' | 'admin' | 'employee' | null;
-  };
-}
-
-export interface UserWithProfile extends User {
-  profile: Profile;
-}
+// --- TYPE DEFINITIONS ---
 
 export interface Profile {
-  id: string; // Foreign key to auth.users.id
-  first_name: string | null;
-  last_name: string | null;
-  position: string | null;
-  hourly_rate: number | null;
-  avatar_url: string | null;
-  age: number | null;
-  mobile_number: string | null;
-  role: 'superadmin' | 'admin' | 'employee' | null;
-  email: string | null; // The user's email, synced from auth.users
-  status: 'active' | 'inactive';
+  id: string; // user id
+  employee_id?: string | null;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  age?: number | null;
+  mobile_number?: string | null;
+  position?: string | null;
+  daily_rate?: number | null;
+  avatar_url?: string | null;
+  role?: 'admin' | 'employee' | 'superadmin' | null;
+  status?: 'active' | 'inactive' | null;
+  department_id?: number | null;
+  departments?: Department | null; // For joined data
+  created_at?: string;
 }
 
 export interface DtrEntry {
   id: number;
   user_id: string;
-  time_in: string; // ISO 8601 timestamp
-  time_out: string | null; // ISO 8601 timestamp
-  profiles?: Profile; // for joins
+  time_in: string | null;
+  time_out: string | null;
+  created_at: string;
 }
 
 export interface Payroll {
@@ -61,397 +47,333 @@ export interface Payroll {
   pay_period_end: string;
   total_hours: number;
   gross_pay: number;
-  deductions: number;
+  lateness_minutes: number;
+  early_departure_minutes: number;
+  lateness_deductions: number;
+  early_departure_deductions: number;
+  manual_deductions: number;
   net_pay: number;
-  status: 'pending' | 'processing' | 'paid';
-  profiles?: Profile; // for joins
+  created_at: string;
+  status: 'Paid' | 'Delayed' | 'Unpaid';
 }
 
 export interface Department {
   id: number;
   name: string;
-  default_hourly_rate: number;
-  work_start_time: string; // 'HH:mm' format
-  work_end_time: string; // 'HH:mm' format
-  lateness_deduction_per_minute: number;
-  grace_period_minutes: number;
+  work_start_time?: string; // e.g., '09:00:00'
+  work_end_time?: string;   // e.g., '18:00:00'
+  grace_period_minutes?: number;
+  deduction_rate_per_minute?: number;
 }
 
-export interface PayrollPreviewItem {
-  user_id: string;
-  profile: Profile;
-  total_hours: number;
-  gross_pay: number;
-  auto_lateness_deductions: number; 
-  deductions: number; // Final deductions, can be manually edited
-  net_pay: number;
+export interface NewUserPayload {
+  email: string;
+  password?: string;
+  imageFile: File | null;
+  profileData: Partial<Profile>;
 }
+
+export type UserWithProfile = User & { profile: Profile | null };
 
 @Injectable({
   providedIn: 'root',
 })
 export class SupabaseService {
   private supabase: SupabaseClient;
-  private readonly router: Router = inject(Router);
+  private router = inject(Router);
 
-  currentUser = signal<User | null | undefined>(undefined);
-  currentUserProfile = signal<Profile | null | undefined>(undefined);
-  currentUserRole = computed<'superadmin' | 'admin' | 'employee' | null>(() => this.currentUserProfile()?.role ?? null);
-  profileError = signal<string | null>(null);
+  // --- STATE SIGNALS ---
+
   isInitialized = signal(false);
+  currentUser = signal<User | null>(null);
+  currentUserProfile = signal<Profile | null>(null);
+  profileError = signal<string | null>(null);
+
+  currentUserRole = computed<'superadmin' | 'admin' | 'employee' | null>(() => this.currentUserProfile()?.role || null);
 
   constructor() {
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey);
 
     this.supabase.auth.onAuthStateChange((event, session) => {
-      const user = session?.user ?? null;
-      this.currentUser.set(user);
-
-      if (user) {
-        // Fetch profile without blocking auth flow. 
-        // The UI will reactively update when the profile is ready.
-        this.fetchUserProfile(user.id);
+      if (session) {
+        this.currentUser.set(session.user);
+        if (session.user) {
+          this.loadUserProfile(session.user.id);
+        } else {
+          this.currentUserProfile.set(null);
+        }
       } else {
+        this.currentUser.set(null);
         this.currentUserProfile.set(null);
       }
-
-      if (event === 'SIGNED_OUT') {
-        this.router.navigate(['/login']);
-      }
-      
-      // Mark service as initialized to unblock auth guards and startup logic.
-      if (!this.isInitialized()) {
-        this.isInitialized.set(true);
-      }
+      this.isInitialized.set(true);
     });
   }
-  
-  private async fetchUserProfile(userId: string): Promise<void> {
+
+  // --- AUTHENTICATION ---
+
+  signInWithPassword(credentials: SignInWithPasswordCredentials): Promise<AuthTokenResponse> {
+    return this.supabase.auth.signInWithPassword(credentials);
+  }
+
+  signOut() {
+    return this.supabase.auth.signOut();
+  }
+
+  // --- PROFILE MANAGEMENT ---
+
+  async loadUserProfile(userId: string): Promise<void> {
     this.profileError.set(null);
     try {
-      const { data, error, status } = await this.supabase
+      // 1. Get the profile
+      const { data: profile, error: profileError } = await this.supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
+      if (profileError) throw profileError;
+
+      // 2. Get the department if department_id exists
+      let department: Department | null = null;
+      if (profile && profile.department_id) {
+        const { data: deptData, error: deptError } = await this.supabase
+          .from('departments')
+          .select('*')
+          .eq('id', profile.department_id)
+          .single();
+        if (deptError) {
+          console.warn(`Could not fetch department for user ${userId}:`, deptError.message);
+        } else {
+          department = deptData;
+        }
+      }
       
-      if (error && status !== 406) throw error;
-      
-      this.currentUserProfile.set(data as Profile);
+      // 3. Combine them and set the signal
+      const profileWithDepartment = {
+        ...profile,
+        departments: department,
+      };
+      this.currentUserProfile.set(profileWithDepartment);
+
     } catch (error: any) {
       this.profileError.set(error.message);
       this.currentUserProfile.set(null);
     }
   }
-  
-  async getProfileForCurrentUser(): Promise<{ data: Profile | null, error: PostgrestError | null }> {
-    const user = this.currentUser();
-    if (!user) throw new Error('User not authenticated.');
-    return this.supabase.from('profiles').select('*').eq('id', user.id).single();
-  }
 
-  async updateProfileForCurrentUser(profileData: Partial<Profile>): Promise<{ data: Profile | null, error: PostgrestError | null }> {
-    const user = this.currentUser();
-    if (!user) throw new Error('User not authenticated.');
-    
-    const { data, error } = await this.supabase
-      .from('profiles')
-      .update(profileData)
-      .eq('id', user.id)
-      .select()
-      .single();
-      
-    if (data) {
-        this.currentUserProfile.set(data);
+  async getAllUsersWithProfiles() {
+    // 1. Get all departments first to create a lookup map.
+    const { data: departments, error: deptError } = await this.supabase.from('departments').select('*');
+    if (deptError) {
+      // Propagate the error in the expected format.
+      return { data: null, error: deptError };
     }
-    
-    return { data, error };
-  }
+    const departmentsMap = new Map((departments || []).map(d => [d.id, d]));
 
-  signInWithPassword(credentials: { email: string, password: string }): Promise<{ data: { user: User | null, session: Session | null }, error: AuthError | null }> {
-    return this.supabase.auth.signInWithPassword(credentials);
-  }
-
-  signOut(): Promise<{ error: AuthError | null }> {
-    return this.supabase.auth.signOut();
-  }
-
-  async getOpenDtrEntry(): Promise<{ data: DtrEntry | null, error: PostgrestError | null }> {
-    const user = this.currentUser();
-    if (!user) throw new Error('User not authenticated.');
-    
-    return this.supabase
-      .from('dtr_entries')
-      .select('*')
-      .eq('user_id', user.id)
-      .is('time_out', null)
-      .maybeSingle();
-  }
-
-  async getDtrHistoryForCurrentUser(): Promise<{ data: DtrEntry[] | null, error: PostgrestError | null }> {
-    const user = this.currentUser();
-    if (!user) throw new Error('User not authenticated.');
-    
-    return this.supabase
-      .from('dtr_entries')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('time_in', { ascending: false });
-  }
-
-  async clockIn(): Promise<{ data: DtrEntry | null, error: PostgrestError | null }> {
-    const user = this.currentUser();
-    if (!user) throw new Error('User not authenticated.');
-
-    return this.supabase
-      .from('dtr_entries')
-      .insert({ user_id: user.id, time_in: new Date().toISOString() })
-      .select()
-      .single();
-  }
-
-  async clockOut(entryId: number): Promise<{ data: DtrEntry | null, error: PostgrestError | null }> {
-    return this.supabase
-      .from('dtr_entries')
-      .update({ time_out: new Date().toISOString() })
-      .eq('id', entryId)
-      .select()
-      .single();
-  }
-
-  async getPayrollsForCurrentUser(): Promise<{ data: Payroll[] | null, error: PostgrestError | null }> {
-      const user = this.currentUser();
-      if (!user) throw new Error('User not authenticated.');
-      
-      return this.supabase
-        .from('payrolls')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('pay_period_end', { ascending: false });
-  }
-  
-  async getAllDepartments(): Promise<{ data: Department[] | null, error: PostgrestError | null }> {
-      return this.supabase.from('departments').select('*').order('name');
-  }
-
-  async getAllUsersWithProfiles(): Promise<{ data: Profile[] | null, error: PostgrestError | null }> {
-    const { data, error } = await this.supabase
-      .from('profiles')
-      .select('*')
-      .eq('status', 'active') // Only fetch active users
-      .order('last_name', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching users with profiles:', error);
-      const detailedMessage = `Failed to fetch employee data. Check your RLS policies on the 'profiles' table. Original error: ${error.message}`;
-      const readableError = { ...error, message: detailedMessage };
-      return { data: null, error: readableError as any };
+    // 2. Get all active profiles.
+    const { data: profiles, error: profileError } = await this.supabase.from('profiles').select('*').eq('status', 'active');
+    if (profileError) {
+      return { data: null, error: profileError };
     }
-    
-    return { data, error };
-  }
-  
-  async getAllDtrEntries(): Promise<{ data: (DtrEntry & { profiles: Profile })[] | null, error: PostgrestError | null }> {
-    const { data, error } = await this.supabase
-      .from('dtr_entries')
-      .select('*, profiles(*)')
-      .order('time_in', { ascending: false });
-
-    return { data: data as any, error };
-  }
-  
-  async getAllPayrolls(): Promise<{ data: (Payroll & { profiles: Profile })[] | null, error: PostgrestError | null }> {
-    const { data, error } = await this.supabase
-      .from('payrolls')
-      .select('*, profiles(*)')
-      .order('pay_period_end', { ascending: false });
-
-    return { data: data as any, error };
-  }
-
-  async createNewUser(payload: NewUserPayload): Promise<{ user: User, profile: Profile, qrData: string }> {
-    // This function performs all actions as the currently authenticated admin.
-    // It relies on RLS policies that allow admins to create profiles and upload avatars.
-
-    // Preserve admin session, as signUp temporarily changes the auth state.
-    const { data: { session: adminSession } } = await this.supabase.auth.getSession();
-    if (!adminSession) {
-      throw new Error("Admin not authenticated. Cannot create user.");
+    if (!profiles) {
+      return { data: [], error: null };
     }
 
+    // 3. Manually "join" the department data to each profile.
+    const profilesWithDepartments = profiles.map(p => ({
+      ...p,
+      departments: p.department_id ? departmentsMap.get(p.department_id) || null : null
+    }));
+
+    // 4. Return the combined data in the expected Supabase response format.
+    return { data: profilesWithDepartments, error: null };
+  }
+  
+  updateUserProfile(userId: string, profileData: Partial<Profile>) {
+    return this.supabase.from('profiles').update(profileData).eq('id', userId);
+  }
+
+  async createNewUser(payload: NewUserPayload) {
+    // 1. Create the user
     const { data: authData, error: authError } = await this.supabase.auth.signUp({
       email: payload.email,
-      password: payload.password,
+      password: payload.password!,
     });
-
-    if (authError) throw new Error(`Failed to create user account: ${authError.message}`);
-    if (!authData.user) throw new Error('User creation failed: The user account was not created in Supabase Auth.');
-
+    if (authError) throw authError;
+    if (!authData.user) throw new Error('User creation failed.');
+    
     const user = authData.user;
-
-    // Immediately restore the admin session.
-    const { error: restoreError } = await this.supabase.auth.setSession({
-        access_token: adminSession.access_token,
-        refresh_token: adminSession.refresh_token,
-    });
-    if (restoreError) {
-        this.router.navigate(['/login']); // Force re-login for safety
-        throw new Error("Critical error: User auth record was created, but admin session could not be restored. Please log in again.");
+    
+    // 2. Upload avatar if it exists
+    let avatarUrl: string | null = null;
+    if (payload.imageFile) {
+      const filePath = `avatars/${user.id}/${payload.imageFile.name}`;
+      const { error: uploadError } = await this.supabase.storage
+        .from('avatars')
+        .upload(filePath, payload.imageFile);
+      if (uploadError) console.error('Error uploading avatar:', uploadError);
+      
+      const { data: urlData } = this.supabase.storage.from('avatars').getPublicUrl(filePath);
+      avatarUrl = urlData.publicUrl;
     }
 
-    // With admin privileges restored, create the user's profile and avatar.
-    let avatar_url: string | null = null;
-    try {
-      if (payload.imageFile) {
-        const filePath = `${user.id}/${Date.now()}_${payload.imageFile.name}`;
-        const { error: uploadError } = await this.supabase.storage
-          .from('avatars')
-          .upload(filePath, payload.imageFile);
+    // 3. Create the profile
+    const profileToInsert = {
+      ...payload.profileData,
+      id: user.id,
+      email: user.email,
+      avatar_url: avatarUrl,
+    };
+    
+    const { data: profile, error: profileError } = await this.supabase
+      .from('profiles')
+      .insert(profileToInsert)
+      .select()
+      .single();
+    if (profileError) {
+      console.error('Error creating profile, user was created but profile failed:', profileError);
+      throw profileError;
+    }
+    
+    const qrData = JSON.stringify({ userId: user.id, email: user.email });
 
-        if (uploadError) {
-          throw new Error(`Avatar upload failed: ${uploadError.message}. (Hint: Check Storage RLS policies for admins.)`);
-        }
-        
-        const { data: urlData } = this.supabase.storage.from('avatars').getPublicUrl(filePath);
-        avatar_url = urlData.publicUrl;
-      }
+    return { user, profile, qrData };
+  }
 
-      // This assumes a DB trigger has already created a basic profile row upon user signup.
-      const { profileData } = payload;
-      const profileToUpdate = {
-        email: user.email,
-        avatar_url,
-        first_name: profileData.first_name,
-        last_name: profileData.last_name,
-        age: profileData.age,
-        mobile_number: profileData.mobile_number,
-        position: profileData.position,
-        hourly_rate: profileData.hourly_rate,
-        role: profileData.role,
-        status: 'active' as const,
-      };
 
-      const { data: updatedProfile, error: profileError } = await this.supabase
-        .from('profiles')
-        .update(profileToUpdate)
-        .eq('id', user.id)
+  // --- DTR (Daily Time Record) ---
+
+  async handleQrCodeLogin(userId: string) {
+    // 1. Fetch user's profile
+    const { data: profile, error: profileError } = await this.supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (profileError) throw new Error('User not found.');
+    if (profile.status !== 'active') throw new Error('User account is inactive.');
+
+    // 2. Check for the last DTR entry for today
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: lastEntry, error: dtrError } = await this.supabase
+      .from('dtr_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('created_at', `${today}T00:00:00.000Z`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (dtrError) throw dtrError;
+
+    let dtrEntry: DtrEntry;
+
+    if (!lastEntry || lastEntry.time_out) {
+      // Time IN
+      const { data: newEntry, error: insertError } = await this.supabase
+        .from('dtr_entries')
+        .insert({ user_id: userId, time_in: new Date().toISOString() })
         .select()
         .single();
-
-      if (profileError) {
-        throw new Error(`Profile update failed: ${profileError.message}. (Hint: Check RLS 'update' policies on the 'profiles' table for admins.)`);
-      }
-      
-      if (!updatedProfile) {
-        throw new Error('Profile data was not returned after update. A database trigger to auto-create a profile for new users might be missing.');
-      }
-
-      const qrData = JSON.stringify({ userId: user.id, email: user.email });
-      
-      return { user, profile: updatedProfile, qrData };
-
-    } catch (error) {
-        console.error("Error during post-signup processing:", error);
-        throw error;
+      if (insertError) throw insertError;
+      dtrEntry = newEntry;
+    } else {
+      // Time OUT
+      const { data: updatedEntry, error: updateError } = await this.supabase
+        .from('dtr_entries')
+        .update({ time_out: new Date().toISOString() })
+        .eq('id', lastEntry.id)
+        .select()
+        .single();
+      if (updateError) throw updateError;
+      dtrEntry = updatedEntry;
     }
+
+    return { profile, dtrEntry };
   }
 
-  async createDepartment(departmentData: Omit<Department, 'id'>): Promise<{ data: Department | null, error: PostgrestError | null }> {
+  getAllDtrEntries() {
     return this.supabase
-      .from('departments')
-      .insert(departmentData)
-      .select()
-      .single();
-  }
-  
-  async updateDepartment(id: number, departmentData: Partial<Omit<Department, 'id'>>): Promise<{ data: Department | null, error: PostgrestError | null }> {
-    return this.supabase
-      .from('departments')
-      .update(departmentData)
-      .eq('id', id)
-      .select()
-      .single();
+      .from('dtr_entries')
+      .select(`
+        *,
+        profiles (
+          first_name,
+          last_name
+        )
+      `)
+      .order('time_in', { ascending: false });
   }
 
-  async deleteDepartment(id: number): Promise<{ error: PostgrestError | null }> {
+  getDtrHistoryForCurrentUser() {
+    const userId = this.currentUser()?.id;
+    if (!userId) {
+      return Promise.resolve({ data: [], error: new Error('User not logged in.') });
+    }
+    return this.supabase
+      .from('dtr_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .order('time_in', { ascending: false });
+  }
+
+  async getDtrEntriesForDateRange(startDate: string, endDate: string) {
+    return this.supabase
+      .from('dtr_entries')
+      .select('*')
+      .gte('time_in', startDate)
+      .lte('time_in', endDate);
+  }
+
+  // --- DEPARTMENTS ---
+
+  getAllDepartments() {
+    return this.supabase.from('departments').select('*');
+  }
+
+  createDepartment(department: Partial<Department>) {
+    return this.supabase.from('departments').insert(department);
+  }
+
+  updateDepartment(id: number, department: Partial<Department>) {
+    return this.supabase.from('departments').update(department).eq('id', id);
+  }
+
+  deleteDepartment(id: number) {
     return this.supabase.from('departments').delete().eq('id', id);
   }
 
-  async updateUserProfile(userId: string, profileData: Partial<Profile>): Promise<{ data: Profile | null, error: PostgrestError | null }> {
-    const { data, error } = await this.supabase
-      .from('profiles')
-      .update(profileData)
-      .eq('id', userId)
-      .select()
-      .maybeSingle();
-
-    if (error) {
-      return { data: null, error };
-    }
-    
-    if (!data) {
-      // This handles the "zero rows found" case from .maybeSingle().
-      const notFoundError: PostgrestError = {
-        name: 'PostgrestError',
-        message: 'Update successful, but failed to retrieve the updated profile. RLS policies may be preventing access.',
-        details: `No profile found for user ID ${userId} after update.`,
-        hint: 'Check that your RLS SELECT policy allows admins to view the profiles they have just updated.',
-        code: 'PGRST116' // Not found
-      };
-      return { data: null, error: notFoundError };
-    }
-    
-    return { data, error: null };
-  }
-
-  async getAllOpenDtrEntries(): Promise<{ data: DtrEntry[] | null, error: PostgrestError | null }> {
-    return this.supabase
-      .from('dtr_entries')
-      .select('*')
-      .is('time_out', null);
-  }
-
-  async getDtrEntriesForPeriod(startDate: string, endDate: string): Promise<{ data: (DtrEntry & { profiles: Profile })[] | null, error: PostgrestError | null }> {
-    const { data, error } = await this.supabase
-      .from('dtr_entries')
-      .select('*, profiles(*)')
-      .gte('time_in', startDate)
-      .lte('time_out', endDate)
-      .not('time_out', 'is', null);
-  
-    return { data: data as any, error };
-  }
-
-  async finalizePayrolls(payrollsToCreate: Omit<Payroll, 'id' | 'profiles'>[]): Promise<{ data: Payroll[] | null, error: PostgrestError | null }> {
+  // --- PAYROLL ---
+  getAllPayrolls() {
     return this.supabase
       .from('payrolls')
-      .insert(payrollsToCreate)
-      .select();
-  }
-
-  async handleQrCodeLogin(userId: string): Promise<{ profile: Profile, dtrEntry: DtrEntry }> {
-    // This securely calls a database function (RPC) to handle the logic.
-    // The 'handle_qr_scan' function must be created in your Supabase SQL Editor.
-    const { data, error } = await this.supabase.rpc('handle_qr_scan', {
-      user_id_input: userId
-    });
-
-    if (error) {
-      // Make the error from the RPC function more user-friendly.
-      if (error.message.includes('User profile not found')) {
-        throw new Error('User profile not found. The QR code may be invalid or the employee may no longer be active.');
-      }
-      throw new Error(`An error occurred during QR scan: ${error.message}`);
-    }
-
-    if (!data || !data.profile || !data.dtrEntry) {
-        throw new Error('Received an invalid response from the server after QR scan.');
-    }
-    
-    return data;
+      .select(`
+        *,
+        profiles (
+          first_name,
+          last_name
+        )
+      `)
+      .order('created_at', { ascending: false });
   }
   
-  async deleteDtrEntry(id: number): Promise<{ error: PostgrestError | null }> {
-    return this.supabase.from('dtr_entries').delete().eq('id', id);
+  getPayrollsForCurrentUser() {
+    const userId = this.currentUser()?.id;
+    if (!userId) {
+      return Promise.resolve({ data: [], error: new Error('User not logged in.') });
+    }
+    return this.supabase.from('payrolls').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+  }
+
+  async runPayrollForEmployees(payrolls: Omit<Payroll, 'id' | 'created_at' | 'status'>[]) {
+    const payrollsToInsert = payrolls.map(p => ({
+      ...p,
+      status: 'Paid' as const,
+    }));
+    return this.supabase.from('payrolls').insert(payrollsToInsert);
+  }
+  
+  updatePayrollStatus(payrollId: number, status: 'Paid' | 'Delayed' | 'Unpaid') {
+    return this.supabase.from('payrolls').update({ status }).eq('id', payrollId).select().single();
   }
 }

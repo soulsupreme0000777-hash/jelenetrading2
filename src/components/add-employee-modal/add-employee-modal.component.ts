@@ -29,12 +29,14 @@ export class AddEmployeeModalComponent {
   qrCanvas = viewChild<ElementRef<HTMLCanvasElement>>('qrCanvas');
 
   // Form state
+  employeeId = signal('');
   firstName = signal('');
+  middleName = signal('');
   lastName = signal('');
   email = signal('');
   password = signal('');
   position = signal('');
-  hourlyRate = signal<number | null>(null);
+  dailyRate = signal<number | null>(null);
   selectedDepartmentId = signal<string>('');
   age = signal<number | null>(null);
   mobileNumber = signal('');
@@ -46,7 +48,7 @@ export class AddEmployeeModalComponent {
   
   isFormValid = computed(() => {
     const passwordValid = this.isEditMode() || this.password();
-    return this.firstName() && this.lastName() && this.email() && passwordValid && this.selectedDepartmentId() && this.age() !== null && this.mobileNumber();
+    return this.employeeId() && this.firstName() && this.middleName() && this.lastName() && this.email() && passwordValid && this.selectedDepartmentId() && this.position() && this.age() !== null && this.mobileNumber() && this.dailyRate() !== null;
   });
   
   isCameraOn = signal(false);
@@ -68,20 +70,6 @@ export class AddEmployeeModalComponent {
     });
 
     effect(() => {
-      const deptId = this.selectedDepartmentId();
-      if (deptId) {
-        const selectedDept = this.departments().find(d => d.id.toString() === deptId);
-        if (selectedDept) {
-          this.position.set(selectedDept.name);
-          this.hourlyRate.set(selectedDept.default_hourly_rate);
-        }
-      } else {
-        this.position.set('');
-        this.hourlyRate.set(null);
-      }
-    });
-
-    effect(() => {
         const videoEl = this.videoElement();
         if (this.isCameraOn() && videoEl && this.videoStream) {
             videoEl.nativeElement.srcObject = this.videoStream;
@@ -91,16 +79,18 @@ export class AddEmployeeModalComponent {
 
   private populateForm(employee: Profile): void {
     this.resetState();
+    this.employeeId.set(employee.employee_id || '');
     this.firstName.set(employee.first_name || '');
+    this.middleName.set(employee.middle_name || '');
     this.lastName.set(employee.last_name || '');
     this.email.set(employee.email || '');
     this.age.set(employee.age || null);
     this.mobileNumber.set(employee.mobile_number || '');
     this.selectedRole.set(employee.role === 'admin' ? 'admin' : 'employee');
     this.capturedImageDataUrl.set(employee.avatar_url || null);
-    
-    const dept = this.departments().find(d => d.name === employee.position);
-    this.selectedDepartmentId.set(dept ? dept.id.toString() : '');
+    this.dailyRate.set(employee.daily_rate || null);
+    this.position.set(employee.position || '');
+    this.selectedDepartmentId.set(employee.department_id ? employee.department_id.toString() : '');
   }
 
   async startCamera(): Promise<void> {
@@ -189,12 +179,15 @@ export class AddEmployeeModalComponent {
       password: this.password(),
       imageFile: imageFile,
       profileData: {
+        employee_id: this.employeeId(),
         first_name: this.firstName(),
+        middle_name: this.middleName(),
         last_name: this.lastName(),
         age: this.age(),
         mobile_number: this.mobileNumber(),
         position: this.position(),
-        hourly_rate: this.hourlyRate(),
+        department_id: +this.selectedDepartmentId(),
+        daily_rate: this.dailyRate(),
         role: this.selectedRole()
       }
     };
@@ -211,12 +204,15 @@ export class AddEmployeeModalComponent {
     if (!employee) throw new Error("No employee selected for editing.");
     
     const profileData: Partial<Profile> = {
+      employee_id: this.employeeId(),
       first_name: this.firstName(),
+      middle_name: this.middleName(),
       last_name: this.lastName(),
       age: this.age(),
       mobile_number: this.mobileNumber(),
       position: this.position(),
-      hourly_rate: this.hourlyRate(),
+      department_id: +this.selectedDepartmentId(),
+      daily_rate: this.dailyRate(),
       role: this.selectedRole()
     };
     
@@ -266,12 +262,14 @@ export class AddEmployeeModalComponent {
   private resetState(): void {
     this.modalState.set('form');
     this.errorMessage.set(null);
+    this.employeeId.set('');
     this.firstName.set('');
+    this.middleName.set('');
     this.lastName.set('');
     this.email.set('');
     this.password.set('');
     this.position.set('');
-    this.hourlyRate.set(null);
+    this.dailyRate.set(null);
     this.selectedDepartmentId.set('');
     this.age.set(null);
     this.mobileNumber.set('');

@@ -1,0 +1,50 @@
+@if (visible() && employee(); as emp) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm" (click)="closeModal()">
+    <div class="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl m-4" (click)="$event.stopPropagation()">
+      
+      <!-- Modal Header -->
+      <div class="p-6 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Employee ID Card Preview</h2>
+        <div class="flex gap-2">
+          <button (click)="printIdCard()" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v3a2 2 0 002 2h8a2 2 0 002-2v-3h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" /></svg>
+            Print
+          </button>
+          <button (click)="closeModal()" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Modal Body -->
+      <div class="p-8 bg-gray-100 dark:bg-gray-900">
+        <div id="id-card-print-area">
+          <div class="w-full h-[512px] bg-white dark:bg-gray-800 border-2 border-dashed border-gray-400 dark:border-gray-600 rounded-lg flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 p-4 font-sans">
+            <h3 class="text-lg font-semibold">ID Card Template Area</h3>
+            <p class="text-sm mt-2">This is a placeholder for your custom ID card design.</p>
+            <div class="mt-8 text-left w-full space-y-6">
+              <div class="flex items-center gap-4">
+                <div class="w-24 h-24 bg-gray-200 dark:bg-gray-700 border dark:border-gray-600 rounded flex items-center justify-center text-xs text-center p-2">Employee Photo Area</div>
+                <div>
+                  <p class="font-bold text-lg text-gray-800 dark:text-gray-200">{{ emp.first_name }} {{ emp.last_name }}</p>
+                  <p class="text-gray-600 dark:text-gray-400">{{ emp.position }}</p>
+                  @if(emp.employee_id) {
+                    <p class="text-sm font-mono bg-gray-200 dark:bg-gray-700 inline-block px-2 py-0.5 rounded mt-2">{{ emp.employee_id }}</p>
+                  }
+                </div>
+              </div>
+              <div class="flex items-center gap-4">
+                 <div class="w-24 h-24 bg-white border dark:border-gray-600 rounded flex items-center justify-center p-1">
+                    <canvas #qrCanvas></canvas>
+                 </div>
+                 <p class="text-sm">QR code for DTR will be shown here.</p>
+              </div>
+            </div>
+            <p class="mt-auto text-xs">Your final template will be applied here.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+}
