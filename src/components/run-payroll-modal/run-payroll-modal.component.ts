@@ -141,7 +141,8 @@ export class RunPayrollModalComponent {
 
         let totalHours = 0;
         
-        // FIX: Correctly type the initial value for the reduce function to ensure `dtrByDay` is properly typed. This resolves downstream type errors on `dailyEntries`.
+        // FIX: Explicitly typing the initial value of `reduce` ensures the accumulator `acc`
+        // has the correct type, resolving errors when its properties are accessed later.
         const dtrByDay = empDtr.reduce((acc, dtr) => {
           if (dtr.time_in) {
             const day = dtr.time_in.substring(0, 10);

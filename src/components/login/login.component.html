@@ -11,12 +11,11 @@
 
       <form class="space-y-6" [formGroup]="loginForm" (ngSubmit)="onSubmit()">
         <div>
-          <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email address</label>
+          <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
           <input 
             id="email" 
             type="email" 
             formControlName="email"
-            placeholder="you@example.com"
             class="w-full px-4 py-2.5 rounded-md bg-gray-100 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400 transition"
             [class.border-red-500]="email?.touched && email?.invalid"
             [class.dark:border-red-500]="email?.touched && email?.invalid">
@@ -38,7 +37,6 @@
             id="password" 
             type="password" 
             formControlName="password"
-            placeholder="••••••••"
             class="w-full px-4 py-2.5 rounded-md bg-gray-100 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400 transition"
             [class.border-red-500]="password?.touched && password?.invalid"
             [class.dark:border-red-500]="password?.touched && password?.invalid">
