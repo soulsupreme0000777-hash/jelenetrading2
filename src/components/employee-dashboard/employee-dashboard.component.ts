@@ -119,16 +119,16 @@ export class EmployeeDashboardComponent {
     let lateCount = 0;
     let earlyLeaveCount = 0;
 
-    const dtrByDay = currentMonthDtr.reduce<Record<string, DtrEntry[]>>((acc, dtr) => {
+    const dtrByDay: Record<string, DtrEntry[]> = {};
+    for (const dtr of currentMonthDtr) {
         if (dtr.time_in) {
             const day = dtr.time_in.substring(0, 10);
-            if (!acc[day]) {
-              acc[day] = [];
+            if (!dtrByDay[day]) {
+              dtrByDay[day] = [];
             }
-            acc[day].push(dtr);
+            dtrByDay[day].push(dtr);
         }
-        return acc;
-    }, {});
+    }
     
     const department = profile.departments;
     

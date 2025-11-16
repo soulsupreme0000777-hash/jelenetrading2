@@ -110,21 +110,19 @@ export class AdminDashboardComponent {
     }
 
     // 1. Group entries by month.
-    // Fix: Explicitly typing the initial value for reduce ensures the accumulator is correctly typed,
-    // resolving type inference errors in subsequent operations.
-    const groups = allEntries.reduce((acc, entry) => {
+    const groups: Record<string, DtrGroup> = {};
+    for (const entry of allEntries) {
       const date = new Date(entry.time_in!);
       const monthYearValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      if (!acc[monthYearValue]) {
-        acc[monthYearValue] = {
+      if (!groups[monthYearValue]) {
+        groups[monthYearValue] = {
           monthYearDisplay: date.toLocaleString('default', { month: 'long', year: 'numeric' }),
           monthYearValue: monthYearValue,
           entries: []
         };
       }
-      acc[monthYearValue].entries.push(entry);
-      return acc;
-    }, {} as Record<string, DtrGroup>);
+      groups[monthYearValue].entries.push(entry);
+    }
 
     // 2. Convert to array and sort groups (newest first)
     const sortedGroups = Object.values(groups).sort((a, b) => b.monthYearValue.localeCompare(a.monthYearValue));

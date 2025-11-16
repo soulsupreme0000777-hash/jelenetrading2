@@ -142,18 +142,16 @@ export class RunPayrollModalComponent {
         let totalHours = 0;
         
         // Group DTR entries by day.
-        // Fix: Explicitly typing the initial value for reduce ensures the accumulator is correctly typed,
-        // resolving type inference errors in subsequent operations.
-        const dtrByDay = empDtr.reduce((acc, dtr) => {
+        const dtrByDay: Record<string, DtrEntry[]> = {};
+        for (const dtr of empDtr) {
           if (dtr.time_in) {
             const day = dtr.time_in.substring(0, 10);
-            if (!acc[day]) {
-              acc[day] = [];
+            if (!dtrByDay[day]) {
+              dtrByDay[day] = [];
             }
-            acc[day].push(dtr);
+            dtrByDay[day].push(dtr);
           }
-          return acc;
-        }, {} as Record<string, DtrEntry[]>);
+        }
 
         const daysWorked = Object.keys(dtrByDay).length;
         if (daysWorked === 0) continue;
