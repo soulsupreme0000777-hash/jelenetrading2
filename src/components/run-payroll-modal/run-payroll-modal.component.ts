@@ -141,9 +141,10 @@ export class RunPayrollModalComponent {
 
         let totalHours = 0;
         
-        // FIX: Explicitly type accumulator and element for 'reduce' on 'empDtr' as it is inferred as 'any[]'.
-        // This resolves downstream type errors.
-        const dtrByDay = empDtr.reduce((acc: Record<string, DtrEntry[]>, dtr: DtrEntry) => {
+        // Group DTR entries by day.
+        // Fix: Explicitly typing the initial value for reduce ensures the accumulator is correctly typed,
+        // resolving type inference errors in subsequent operations.
+        const dtrByDay = empDtr.reduce((acc, dtr) => {
           if (dtr.time_in) {
             const day = dtr.time_in.substring(0, 10);
             if (!acc[day]) {
