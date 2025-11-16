@@ -141,12 +141,14 @@ export class RunPayrollModalComponent {
 
         let totalHours = 0;
         
-        // FIX: Explicitly typing the initial value of `reduce` ensures the accumulator `acc`
-        // has the correct type, resolving errors when its properties are accessed later.
-        const dtrByDay = empDtr.reduce((acc, dtr) => {
+        // FIX: Explicitly type accumulator and element for 'reduce' on 'empDtr' as it is inferred as 'any[]'.
+        // This resolves downstream type errors.
+        const dtrByDay = empDtr.reduce((acc: Record<string, DtrEntry[]>, dtr: DtrEntry) => {
           if (dtr.time_in) {
             const day = dtr.time_in.substring(0, 10);
-            if (!acc[day]) acc[day] = [];
+            if (!acc[day]) {
+              acc[day] = [];
+            }
             acc[day].push(dtr);
           }
           return acc;

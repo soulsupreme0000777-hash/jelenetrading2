@@ -110,9 +110,8 @@ export class AdminDashboardComponent {
     }
 
     // 1. Group entries by month
-    // FIX: Explicitly typing the initial value of `reduce` ensures the accumulator `acc`
-    // has the correct type, resolving errors when its properties are accessed later.
-    const groups = allEntries.reduce((acc, entry) => {
+    // FIX: Explicitly type the accumulator and initial value for 'reduce' to ensure correct type inference for 'groups'.
+    const groups = allEntries.reduce((acc: Record<string, DtrGroup>, entry) => {
       const date = new Date(entry.time_in!);
       const monthYearValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       if (!acc[monthYearValue]) {
