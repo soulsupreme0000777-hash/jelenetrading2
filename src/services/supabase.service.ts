@@ -66,6 +66,17 @@ export interface Department {
   deduction_rate_per_minute?: number;
 }
 
+export interface SalaryRule {
+  id: number;
+  name: string;
+  description: string | null;
+  raise_percentage: number;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface NewUserPayload {
   email: string;
   password?: string;
@@ -342,6 +353,28 @@ export class SupabaseService {
   deleteDepartment(id: number) {
     return this.supabase.from('departments').delete().eq('id', id);
   }
+
+  // --- SALARY RULES ---
+  getAllSalaryRules() {
+    return this.supabase.from('salary_rules').select('*').order('created_at', { ascending: false });
+  }
+  
+  getActiveSalaryRules() {
+    return this.supabase.from('salary_rules').select('*').eq('is_active', true);
+  }
+
+  createSalaryRule(rule: Omit<SalaryRule, 'id' | 'created_at'>) {
+    return this.supabase.from('salary_rules').insert(rule);
+  }
+
+  updateSalaryRule(id: number, rule: Partial<SalaryRule>) {
+    return this.supabase.from('salary_rules').update(rule).eq('id', id);
+  }
+
+  deleteSalaryRule(id: number) {
+    return this.supabase.from('salary_rules').delete().eq('id', id);
+  }
+
 
   // --- PAYROLL ---
   getAllPayrolls() {

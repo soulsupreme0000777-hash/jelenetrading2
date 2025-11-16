@@ -1,7 +1,9 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { SupabaseService, Profile, DtrEntry, Payroll, Department } from '../../services/supabase.service';
+import { SupabaseService, Profile, DtrEntry, Payroll, Department, SalaryRule } from '../../services/supabase.service';
 import { CurrencyPipe, DatePipe } from '@angular/common';
+import { SalaryAdjustmentModalComponent } from '../salary-adjustment-modal/salary-adjustment-modal.component';
+import { ConfirmationModalComponent } from '../confirmation-modal/confirmation-modal.component';
 
 interface PayrollPreview {
   employeeId: string;
@@ -9,7 +11,9 @@ interface PayrollPreview {
   daysWorked: number;
   totalHours: number;
   dailyRate: number;
-  grossPay: number;
+  baseGrossPay: number;
+  adjustmentAmount: number;
+  grossPay: number; // baseGrossPay + adjustmentAmount
   totalMinutesLate: number;
   totalMinutesEarly: number;
   latenessDeductions: number;
@@ -17,6 +21,13 @@ interface PayrollPreview {
   manualDeductions: number;
   netPay: number;
   selected: boolean;
+  appliedRules: string[];
+}
+
+interface ConfirmModalConfig {
+  title: string;
+  message: string;
+  onConfirm: () => void;
 }
 
 type ModalState = 'config' | 'preview' | 'loading' | 'success' | 'error';
@@ -25,7 +36,7 @@ type ModalState = 'config' | 'preview' | 'loading' | 'success' | 'error';
   selector: 'app-run-payroll-modal',
   templateUrl: './run-payroll-modal.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, CurrencyPipe, DatePipe],
+  imports: [FormsModule, CurrencyPipe, DatePipe, SalaryAdjustmentModalComponent, ConfirmationModalComponent],
 })
 export class RunPayrollModalComponent {
   visible = input.required<boolean>();
@@ -41,6 +52,7 @@ export class RunPayrollModalComponent {
   // Config State
   startDate = signal<string>('');
   endDate = signal<string>('');
+  applyAdjustments = signal(false);
   
   // Preview State
   payrollPreviews = signal<PayrollPreview[]>([]);
@@ -48,9 +60,42 @@ export class RunPayrollModalComponent {
   selectedEmployeesCount = computed(() => this.payrollPreviews().filter(p => p.selected).length);
   isAllSelected = computed(() => this.payrollPreviews().length > 0 && this.payrollPreviews().every(p => p.selected));
 
+  // Salary Rules State
+  salaryRules = signal<SalaryRule[]>([]);
+  salaryRulesLoading = signal(true);
+  salaryRulesError = signal<string | null>(null);
+
+  // Modals State
+  isSalaryAdjustmentModalVisible = signal(false);
+  adjustmentToEdit = signal<SalaryRule | null>(null);
+  isConfirmModalVisible = signal(false);
+  confirmModalConfig = signal<ConfirmModalConfig>({ title: '', message: '', onConfirm: () => {} });
+
   isConfigValid = computed(() => {
     return this.startDate() && this.endDate() && this.startDate() <= this.endDate();
   });
+
+  constructor() {
+    effect(() => {
+      if (this.visible()) {
+        this.loadSalaryRules();
+      }
+    });
+  }
+
+  async loadSalaryRules(): Promise<void> {
+    this.salaryRulesLoading.set(true);
+    this.salaryRulesError.set(null);
+    try {
+      const { data, error } = await this.supabaseService.getAllSalaryRules();
+      if (error) throw error;
+      this.salaryRules.set(data || []);
+    } catch (e: any) {
+      this.salaryRulesError.set(`Failed to load salary rules: ${e.message}`);
+    } finally {
+      this.salaryRulesLoading.set(false);
+    }
+  }
 
   async onGeneratePreview(): Promise<void> {
     if (!this.isConfigValid()) {
@@ -63,16 +108,22 @@ export class RunPayrollModalComponent {
     this.payrollPreviews.set([]);
     
     try {
-      const start = new Date(this.startDate()).toISOString();
+      const start = new Date(this.startDate());
       const end = new Date(this.endDate());
       end.setDate(end.getDate() + 1); // Include the whole end day
-      const endISO = end.toISOString();
       
       const { data: employees, error: empError } = await this.supabaseService.getAllUsersWithProfiles();
       if (empError) throw empError;
       
-      const { data: dtrEntries, error: dtrError } = await this.supabaseService.getDtrEntriesForDateRange(start, endISO);
+      const { data: dtrEntries, error: dtrError } = await this.supabaseService.getDtrEntriesForDateRange(start.toISOString(), end.toISOString());
       if (dtrError) throw dtrError;
+
+      let activeAdjustments: SalaryRule[] = [];
+      if (this.applyAdjustments()) {
+        const { data: adjustments, error: adjError } = await this.supabaseService.getActiveSalaryRules();
+        if(adjError) throw adjError;
+        activeAdjustments = adjustments || [];
+      }
 
       if (!employees || employees.length === 0) {
         throw new Error('No active employees found to run payroll for.');
@@ -90,6 +141,7 @@ export class RunPayrollModalComponent {
 
         let totalHours = 0;
         
+        // FIX: Correctly type the initial value for the reduce function to ensure `dtrByDay` is properly typed. This resolves downstream type errors on `dailyEntries`.
         const dtrByDay = empDtr.reduce((acc, dtr) => {
           if (dtr.time_in) {
             const day = dtr.time_in.substring(0, 10);
@@ -102,15 +154,37 @@ export class RunPayrollModalComponent {
         const daysWorked = Object.keys(dtrByDay).length;
         if (daysWorked === 0) continue;
 
-        const grossPay = daysWorked * emp.daily_rate;
+        const baseGrossPay = daysWorked * emp.daily_rate;
+        let adjustmentAmount = 0;
         let totalMinutesLate = 0;
         let totalMinutesEarly = 0;
+        const appliedRules = new Set<string>();
         
-        Object.values(dtrByDay).forEach((dailyEntries: DtrEntry[]) => {
+        Object.values(dtrByDay).forEach((dailyEntries) => {
           dailyEntries.sort((a, b) => new Date(a.time_in!).getTime() - new Date(b.time_in!).getTime());
           const firstEntry = dailyEntries[0];
           const lastEntry = dailyEntries[dailyEntries.length - 1];
 
+          // --- Calculate Adjustments for the day ---
+          if (this.applyAdjustments()) {
+            const currentDate = new Date(firstEntry.time_in!);
+            const applicableRules = activeAdjustments.filter(rule => {
+              const ruleStart = new Date(rule.start_date);
+              const ruleEnd = new Date(rule.end_date);
+              return currentDate >= ruleStart && currentDate <= ruleEnd;
+            });
+
+            if (applicableRules.length > 0) {
+              // Get the highest percentage raise if multiple rules apply
+              const highestRaise = Math.max(...applicableRules.map(r => r.raise_percentage));
+              const bestRule = applicableRules.find(r => r.raise_percentage === highestRaise)!;
+
+              adjustmentAmount += emp.daily_rate * (bestRule.raise_percentage / 100);
+              appliedRules.add(bestRule.name);
+            }
+          }
+
+          // --- Calculate Total Hours & Deductions ---
           dailyEntries.forEach(dtr => {
             if (dtr.time_in && dtr.time_out) {
               totalHours += (new Date(dtr.time_out).getTime() - new Date(dtr.time_in).getTime()) / (1000 * 60 * 60);
@@ -144,6 +218,7 @@ export class RunPayrollModalComponent {
         const deductionRate = department?.deduction_rate_per_minute || 0;
         const latenessDeductions = totalMinutesLate * deductionRate;
         const earlyDepartureDeductions = totalMinutesEarly * deductionRate;
+        const grossPay = baseGrossPay + adjustmentAmount;
         const netPay = grossPay - latenessDeductions - earlyDepartureDeductions;
         
         previews.push({
@@ -152,6 +227,8 @@ export class RunPayrollModalComponent {
           daysWorked,
           totalHours: parseFloat(totalHours.toFixed(2)),
           dailyRate: emp.daily_rate,
+          baseGrossPay: parseFloat(baseGrossPay.toFixed(2)),
+          adjustmentAmount: parseFloat(adjustmentAmount.toFixed(2)),
           grossPay: parseFloat(grossPay.toFixed(2)),
           totalMinutesLate,
           totalMinutesEarly,
@@ -160,6 +237,7 @@ export class RunPayrollModalComponent {
           manualDeductions: 0,
           netPay: parseFloat(netPay.toFixed(2)),
           selected: true,
+          appliedRules: Array.from(appliedRules),
         });
       }
       
@@ -245,6 +323,42 @@ export class RunPayrollModalComponent {
     }
   }
 
+  // --- Salary Rule Modal Management ---
+  openAddSalaryRuleModal(): void {
+    this.adjustmentToEdit.set(null);
+    this.isSalaryAdjustmentModalVisible.set(true);
+  }
+
+  openEditSalaryRuleModal(rule: SalaryRule): void {
+    this.adjustmentToEdit.set(rule);
+    this.isSalaryAdjustmentModalVisible.set(true);
+  }
+
+  closeSalaryRuleModal(): void {
+    this.isSalaryAdjustmentModalVisible.set(false);
+    this.adjustmentToEdit.set(null);
+  }
+
+  openDeleteSalaryRuleConfirmation(rule: SalaryRule): void {
+    this.confirmModalConfig.set({
+      title: 'Delete Salary Rule?',
+      message: `Are you sure you want to delete the "${rule.name}" rule? This action cannot be undone.`,
+      onConfirm: () => this.handleDeleteSalaryRule(rule.id),
+    });
+    this.isConfirmModalVisible.set(true);
+  }
+
+  async handleDeleteSalaryRule(id: number): Promise<void> {
+    const { error } = await this.supabaseService.deleteSalaryRule(id);
+    if (error) {
+      alert(`Error deleting salary rule: ${error.message}`);
+    } else {
+      this.loadSalaryRules();
+    }
+    this.isConfirmModalVisible.set(false);
+  }
+
+
   goBackToConfig(): void {
     this.modalState.set('config');
     this.errorMessage.set(null);
@@ -261,6 +375,7 @@ export class RunPayrollModalComponent {
     this.errorMessage.set(null);
     this.startDate.set('');
     this.endDate.set('');
+    this.applyAdjustments.set(false);
     this.payrollPreviews.set([]);
   }
 }

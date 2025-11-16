@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, effect, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { SupabaseService, Profile, DtrEntry, Payroll, Department } from '../../services/supabase.service';
+import { SupabaseService, Profile, DtrEntry, Payroll, Department, SalaryRule } from '../../services/supabase.service';
 import { AddEmployeeModalComponent } from '../add-employee-modal/add-employee-modal.component';
 import { AddDepartmentModalComponent } from '../add-department-modal/add-department-modal.component';
 import { RunPayrollModalComponent } from '../run-payroll-modal/run-payroll-modal.component';
@@ -110,6 +110,7 @@ export class AdminDashboardComponent {
     }
 
     // 1. Group entries by month
+    // FIX: Correctly type the initial value for the reduce function to ensure `groups` is properly typed as `Record<string, DtrGroup>`. This resolves downstream type errors.
     const groups = allEntries.reduce((acc, entry) => {
       const date = new Date(entry.time_in!);
       const monthYearValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -168,7 +169,7 @@ export class AdminDashboardComponent {
   departments = signal<Department[]>([]);
   departmentsLoading = signal(true);
   departmentsError = signal<string | null>(null);
-  
+
   // --- Analytics Signals ---
   analyticsMonth = signal<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM format
   analyticsLoading = signal(false);
@@ -240,8 +241,6 @@ export class AdminDashboardComponent {
               const firstEntry = empDtrForDay[0];
               const lastEntry = empDtrForDay[empDtrForDay.length - 1];
 
-              // FIX: Use the pre-joined department data from the employee profile.
-              // This is more efficient and fixes a type inference issue with the previous Map-based lookup.
               const department = emp.departments;
 
               if (department) {

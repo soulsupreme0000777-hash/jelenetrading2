@@ -1,6 +1,7 @@
+
 @if (visible()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm" (click)="closeModal()">
-    <div class="relative w-full max-w-6xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl m-4 max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+    <div class="relative w-full max-w-7xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl m-4 max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
       
       <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Run New Payroll</h2>
@@ -12,22 +13,92 @@
       <div class="p-8 overflow-y-auto">
         @switch (modalState()) {
           @case ('config') {
-            <div class="space-y-6">
-              <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">Select Pay Period</h3>
-              @if (errorMessage()) {
-                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
-                  <p>{{ errorMessage() }}</p>
+            <div class="space-y-8">
+              <!-- Pay Period Selection -->
+              <div>
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">1. Select Pay Period</h3>
+                @if (errorMessage()) {
+                  <div class="mt-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
+                    <p>{{ errorMessage() }}</p>
+                  </div>
+                }
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                  <div>
+                    <label for="startDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</label>
+                    <input type="date" id="startDate" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" name="startDate" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+                  </div>
+                  <div>
+                    <label for="endDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300">End Date</label>
+                    <input type="date" id="endDate" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" name="endDate" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+                  </div>
                 </div>
-              }
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label for="startDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</label>
-                  <input type="date" id="startDate" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" name="startDate" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+              </div>
+
+              <!-- Salary Rules Management -->
+              <div>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">2. Manage Salary Rules</h3>
+                    <button (click)="openAddSalaryRuleModal()" class="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors text-sm">
+                        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                        <span>Add New Rule</span>
+                    </button>
                 </div>
-                <div>
-                  <label for="endDate" class="block text-sm font-medium text-gray-700 dark:text-gray-300">End Date</label>
-                  <input type="date" id="endDate" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" name="endDate" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
-                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border dark:border-gray-700">
+                    @if(salaryRulesLoading()){ <p class="text-gray-700 dark:text-gray-300 text-center p-8">Loading salary rules...</p> }
+                    @else if(salaryRulesError()){ <p class="text-red-500 text-center p-8">{{salaryRulesError()}}</p> }
+                    @else {
+                      <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                          <thead class="bg-gray-50 dark:bg-gray-700/50">
+                            <tr>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rule Name</th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Raise</th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Effective Period</th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            @for(rule of salaryRules(); track rule.id) {
+                              <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                  <div class="text-sm font-medium text-gray-900 dark:text-white">{{rule.name}}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">+{{rule.raise_percentage}}%</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                  {{rule.start_date | date:'mediumDate'}} - {{rule.end_date | date:'mediumDate'}}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                  @if(rule.is_active) {
+                                    <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">Active</span>
+                                  } @else {
+                                    <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">Inactive</span>
+                                  }
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-4">
+                                  <button (click)="openEditSalaryRuleModal(rule)" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200">Edit</button>
+                                  <button (click)="openDeleteSalaryRuleConfirmation(rule)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200">Delete</button>
+                                </td>
+                              </tr>
+                            } @empty {
+                              <tr><td colspan="5" class="text-center py-8 text-gray-500 dark:text-gray-400">No salary rules found.</td></tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    }
+                  </div>
+              </div>
+
+              <!-- Apply Adjustments Toggle -->
+               <div class="pt-4">
+                 <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">3. Final Configuration</h3>
+                <label class="relative inline-flex items-center cursor-pointer mt-4">
+                  <input type="checkbox" [ngModel]="applyAdjustments()" (ngModelChange)="applyAdjustments.set($event)" name="applyAdjustments" class="sr-only peer">
+                  <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                  <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">Apply Active Salary Rules to this Payroll</span>
+                </label>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-14">Automatically include raises from active salary rules within the selected pay period.</p>
               </div>
             </div>
           }
@@ -47,12 +118,11 @@
                         <input type="checkbox" class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 bg-gray-100 dark:bg-gray-900 dark:ring-offset-gray-800" [checked]="isAllSelected()" (change)="toggleSelectAll()">
                       </th>
                       <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Employee</th>
-                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Days Worked</th>
-                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Gross Pay</th>
-                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mins Late</th>
-                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Late Deduction</th>
-                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mins Early Out</th>
-                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Early Out Deduction</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Days</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Base Gross</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Adjustments</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Final Gross</th>
+                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Deductions</th>
                       <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Manual Deduction</th>
                       <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Net Pay</th>
                     </tr>
@@ -65,11 +135,14 @@
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ item.employeeName }}</td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.daysWorked }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.grossPay | currency:'PHP' }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-400">{{ item.totalMinutesLate }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-orange-600 dark:text-orange-400">{{ item.latenessDeductions | currency:'PHP' }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-400">{{ item.totalMinutesEarly }}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-orange-600 dark:text-orange-400">{{ item.earlyDepartureDeductions | currency:'PHP' }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ item.baseGrossPay | currency:'PHP' }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-green-600 dark:text-green-400" [title]="item.appliedRules.join(', ')">
+                            {{ item.adjustmentAmount > 0 ? (item.adjustmentAmount | currency:'PHP') : '—' }}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-600 dark:text-gray-300">{{ item.grossPay | currency:'PHP' }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-orange-600 dark:text-orange-400">
+                          {{ (item.latenessDeductions + item.earlyDepartureDeductions) | currency:'PHP' }}
+                        </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm">
                           <input type="number" class="w-24 px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200" [value]="item.manualDeductions" (input)="updateManualDeduction(item.employeeId, $event)" min="0" step="0.01">
                         </td>
@@ -79,7 +152,7 @@
                   </tbody>
                   <tfoot class="bg-gray-50 dark:bg-gray-700/50">
                     <tr>
-                      <td colspan="9" class="px-4 py-3 text-right text-sm font-bold text-gray-700 dark:text-gray-200">Total Payroll Cost ({{ selectedEmployeesCount() }} employees):</td>
+                      <td colspan="8" class="px-4 py-3 text-right text-sm font-bold text-gray-700 dark:text-gray-200">Total Payroll Cost ({{ selectedEmployeesCount() }} employees):</td>
                       <td class="px-4 py-3 text-left text-sm font-bold text-gray-900 dark:text-white">{{ totalPayrollCost() | currency:'PHP' }}</td>
                     </tr>
                   </tfoot>
@@ -117,4 +190,23 @@
       </div>
     </div>
   </div>
+}
+
+@if (isSalaryAdjustmentModalVisible()) {
+  <app-salary-adjustment-modal
+    [visible]="true"
+    [adjustmentToEdit]="adjustmentToEdit()"
+    (close)="closeSalaryRuleModal()"
+    (saved)="loadSalaryRules()"
+  ></app-salary-adjustment-modal>
+}
+
+@if (isConfirmModalVisible()) {
+  <app-confirmation-modal
+    [visible]="true"
+    [title]="confirmModalConfig().title"
+    [message]="confirmModalConfig().message"
+    (close)="isConfirmModalVisible.set(false)"
+    (confirm)="confirmModalConfig().onConfirm()"
+  ></app-confirmation-modal>
 }

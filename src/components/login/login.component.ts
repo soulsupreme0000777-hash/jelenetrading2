@@ -61,16 +61,22 @@ export class LoginComponent implements OnDestroy {
       }
     });
 
-    // Start/stop scanner when view mode changes
+    // Stop scanner when view mode is not 'qr'
     effect((onCleanup) => {
         const mode = this.viewMode();
-        if (mode === 'qr') {
-            this.startScanner();
-        } else {
+        if (mode !== 'qr') {
             this.stopScanner();
         }
         onCleanup(() => this.stopScanner());
     });
+
+    // Start scanner only when view mode is 'qr' AND the video element is ready.
+    effect(() => {
+      const videoElRef = this.video();
+      if (this.viewMode() === 'qr' && videoElRef) {
+        this.startScanner();
+      }
+    }, { allowSignalWrites: true });
   }
 
   ngOnDestroy(): void {
@@ -113,6 +119,7 @@ export class LoginComponent implements OnDestroy {
 
   private async startScanner(): Promise<void> {
     try {
+      if (this.isScanning) { return; } // Prevent starting multiple times
       if (this.stream) this.stopScanner(); // Ensure no existing stream
       
       const videoEl = this.video()?.nativeElement;
