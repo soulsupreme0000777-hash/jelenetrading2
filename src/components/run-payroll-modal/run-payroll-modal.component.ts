@@ -96,7 +96,7 @@ export class RunPayrollModalComponent {
       if(schedError) throw schedError;
 
       const schedulesMap = new Map<string, EmployeeSchedule>();
-      yearlySchedules?.forEach(s => schedulesMap.set(`${s.user_id}-${s.date}`, s));
+      yearlySchedules?.forEach(s => schedulesMap.set(`${s.user_id}|${s.date}`, s));
       
       const previews: PayrollPreview[] = [];
       
@@ -125,7 +125,7 @@ export class RunPayrollModalComponent {
         }
         
         for (const dateKey of Object.keys(dtrByDay)) {
-          const schedule = schedulesMap.get(`${emp.id}-${dateKey}`);
+          const schedule = schedulesMap.get(`${emp.id}|${dateKey}`);
           if (!schedule) continue; // Skip days without a schedule
 
           const dailyEntries = dtrByDay[dateKey];

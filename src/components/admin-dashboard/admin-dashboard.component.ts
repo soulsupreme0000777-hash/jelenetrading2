@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, effect, computed, OnDestroy, viewChild, ElementRef } from '@angular/core';
 import { Router } from '@angular/router';
-import { SupabaseService, Profile, DtrEntry, Payroll, SalaryRule, EmployeeStatus } from '../../services/supabase.service';
+import { SupabaseService, Profile, DtrEntry, Payroll, SalaryRule, EmployeeStatus, EmployeeSchedule } from '../../services/supabase.service';
 import { AddEmployeeModalComponent } from '../add-employee-modal/add-employee-modal.component';
 import { RunPayrollModalComponent } from '../run-payroll-modal/run-payroll-modal.component';
 import { ConfirmationModalComponent } from '../confirmation-modal/confirmation-modal.component';
@@ -20,14 +20,6 @@ interface ConfirmModalConfig {
   onConfirm: () => void;
 }
 
-interface AnalyticsReport {
-  absentCount: number;
-  lateCount: number;
-  earlyCount: number;
-  lateByDay: { day: number; count: number }[];
-  maxLateCount: number;
-}
-
 interface DtrPayPeriodGroup {
   id: string; // e.g., "2023-10-16_2023-11-15"
   display: string; // e.g., "October 16 - November 15, 2023"
@@ -44,6 +36,17 @@ interface PayrollGroup {
 }
 
 type Notification = { type: 'success' | 'error'; message: string };
+
+interface LiveEmployeeStatus {
+  profile: Profile;
+  status: 'Timed In' | 'On Break' | 'Timed Out' | 'Absent' | 'Rest Day';
+  todaysSchedule: string;
+  lastEventTime: Date | null;
+  workDurationSeconds: number;
+  breakTimeRemainingSeconds: number;
+  timerDisplay: string;
+  dtrEntries: DtrEntry[];
+}
 
 const BIRTH_MONTH_BONUS = {
   'branch officer': 1200,
@@ -72,6 +75,7 @@ export class AdminDashboardComponent implements OnDestroy {
   private readonly router: Router = inject(Router);
   private realtimeChannel: RealtimeChannel | null = null;
   private notificationTimer: any;
+  private timerInterval: any;
 
   readonly currentUserRole = this.supabaseService.currentUserRole;
   activeTab = signal<AdminTab>('employees');
@@ -266,35 +270,9 @@ export class AdminDashboardComponent implements OnDestroy {
   });
 
   // --- Analytics Signals ---
-  analyticsMonth = signal<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM format
-  analyticsLoading = signal(false);
+  liveEmployeeStatus = signal<LiveEmployeeStatus[]>([]);
+  analyticsLoading = signal(true);
   analyticsError = signal<string | null>(null);
-  dtrEntriesForAnalytics = signal<DtrEntry[]>([]);
-
-  monthsForSelector = computed(() => {
-    const months = [];
-    const d = new Date();
-    for (let i = 0; i < 12; i++) {
-      const year = d.getFullYear();
-      const month = d.getMonth() + 1;
-      const monthStr = month < 10 ? `0${month}` : month.toString();
-      months.push({
-        value: `${year}-${monthStr}`,
-        label: d.toLocaleString('default', { month: 'long', year: 'numeric' })
-      });
-      d.setMonth(d.getMonth() - 1);
-    }
-    return months;
-  });
-  
-  totalEmployees = computed(() => this.employees().length);
-
-  analyticsReport = computed<AnalyticsReport>(() => {
-    // This calculation is now incorrect due to schedule changes.
-    // It should be updated to fetch daily schedules.
-    // For now, it will produce inaccurate results.
-    return { absentCount: 0, lateCount: 0, earlyCount: 0, lateByDay: [], maxLateCount: 0 };
-  });
 
   isAddEmployeeModalVisible = signal(false);
   isRunPayrollModalVisible = signal(false); 
@@ -320,6 +298,14 @@ export class AdminDashboardComponent implements OnDestroy {
       if (tab === 'dtr' && this.dtrEntries().length === 0) this.loadDtrAndPayrolls();
       if (tab === 'payroll' && this.payrolls().length === 0) this.loadPayrolls();
       
+      if (tab === 'analytics') {
+        this.loadLiveAnalyticsData();
+        if (this.timerInterval) clearInterval(this.timerInterval);
+        this.timerInterval = setInterval(() => this.updateTimers(), 1000);
+      } else {
+        if (this.timerInterval) clearInterval(this.timerInterval);
+      }
+
       if (this.realtimeChannel) {
         this.supabaseService.unsubscribe(this.realtimeChannel);
       }
@@ -329,11 +315,14 @@ export class AdminDashboardComponent implements OnDestroy {
             this.loadEmployees();
         } else if (currentTab === 'dtr') {
             this.loadDtrAndPayrolls();
+        } else if (currentTab === 'analytics') {
+            this.loadLiveAnalyticsData();
         }
       });
 
       onCleanup(() => {
         if(this.realtimeChannel) this.supabaseService.unsubscribe(this.realtimeChannel);
+        if (this.timerInterval) clearInterval(this.timerInterval);
       });
 
     });
@@ -355,6 +344,9 @@ export class AdminDashboardComponent implements OnDestroy {
     }
     if (this.notificationTimer) {
       clearTimeout(this.notificationTimer);
+    }
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
     }
     this.stopScanner();
   }
@@ -389,11 +381,6 @@ export class AdminDashboardComponent implements OnDestroy {
   setDtrSort(event: Event): void {
     const value = (event.target as HTMLSelectElement).value as 'newest' | 'oldest' | 'nameAsc' | 'nameDesc';
     this.dtrSortOption.set(value);
-  }
-
-  setAnalyticsMonth(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
-    this.analyticsMonth.set(value);
   }
 
   setActiveTab(tab: AdminTab): void {
@@ -448,6 +435,165 @@ export class AdminDashboardComponent implements OnDestroy {
     } finally {
       this.payrollsLoading.set(false);
     }
+  }
+
+  async loadLiveAnalyticsData(): Promise<void> {
+    this.analyticsLoading.set(true);
+    this.analyticsError.set(null);
+
+    try {
+        const today = new Date();
+        const todayStr = today.toISOString().slice(0, 10);
+        const startOfDay = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+        const endOfDay = new Date(new Date().setHours(23, 59, 59, 999)).toISOString();
+
+        const employeesRes = await this.supabaseService.getAllUsersWithProfiles();
+        if (employeesRes.error) throw employeesRes.error;
+        const employees = employeesRes.data || [];
+        if (employees.length === 0) {
+            this.liveEmployeeStatus.set([]);
+            this.analyticsLoading.set(false);
+            return;
+        }
+
+        const employeeIds = employees.map(e => e.id);
+        const [dtrRes, schedulesRes] = await Promise.all([
+            this.supabaseService.getDtrEntriesForDateRange(startOfDay, endOfDay),
+            this.supabaseService.getSchedulesForDateRange(employeeIds, todayStr, todayStr)
+        ]);
+        
+        if (dtrRes.error) throw dtrRes.error;
+        if (schedulesRes.error) throw schedulesRes.error;
+
+        const dtrEntries = dtrRes.data || [];
+        const schedules = schedulesRes.data || [];
+        
+        const dtrMap = new Map<string, DtrEntry[]>();
+        dtrEntries.forEach(dtr => {
+            if (!dtrMap.has(dtr.user_id)) dtrMap.set(dtr.user_id, []);
+            dtrMap.get(dtr.user_id)!.push(dtr);
+        });
+        dtrMap.forEach(entries => entries.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
+        
+        const scheduleMap = new Map<string, EmployeeSchedule>();
+        schedules.forEach(s => scheduleMap.set(s.user_id, s));
+
+        const now = Date.now();
+        const statuses = employees.map((emp): LiveEmployeeStatus => {
+            const todaysEntries = dtrMap.get(emp.id) || [];
+            const schedule = scheduleMap.get(emp.id);
+
+            let status: LiveEmployeeStatus['status'] = 'Absent';
+            let workDurationSeconds = 0;
+            let breakTimeRemainingSeconds = 3600;
+            let lastEventTime: Date | null = null;
+            let todaysSchedule = 'Rest Day';
+
+            if (schedule) {
+                 const startTime = this.formatTimeForDisplay(schedule.work_start_time);
+                 const endTime = this.formatTimeForDisplay(schedule.work_end_time);
+                 todaysSchedule = `${startTime} - ${endTime}`;
+            } else {
+                 status = 'Rest Day';
+            }
+            
+            if (status !== 'Rest Day') {
+                if (todaysEntries.length === 1 && todaysEntries[0].time_in) {
+                    status = 'Timed In';
+                    lastEventTime = new Date(todaysEntries[0].time_in);
+                    workDurationSeconds = (now - lastEventTime.getTime()) / 1000;
+                } else if (todaysEntries.length === 2 && todaysEntries[1].time_out) {
+                    status = 'On Break';
+                    const timeIn1 = new Date(todaysEntries[0].time_in!);
+                    const timeOut1 = new Date(todaysEntries[1].time_out!);
+                    lastEventTime = timeOut1;
+                    workDurationSeconds = (timeOut1.getTime() - timeIn1.getTime()) / 1000;
+                    const elapsedBreak = (now - timeOut1.getTime()) / 1000;
+                    breakTimeRemainingSeconds = 3600 - elapsedBreak;
+                } else if (todaysEntries.length === 3 && todaysEntries[2].time_in) {
+                    status = 'Timed In';
+                    const timeIn1 = new Date(todaysEntries[0].time_in!);
+                    const timeOut1 = new Date(todaysEntries[1].time_out!);
+                    const timeIn2 = new Date(todaysEntries[2].time_in!);
+                    lastEventTime = timeIn2;
+                    const firstPeriod = (timeOut1.getTime() - timeIn1.getTime()) / 1000;
+                    const secondPeriod = (now - timeIn2.getTime()) / 1000;
+                    workDurationSeconds = firstPeriod + secondPeriod;
+                } else if (todaysEntries.length >= 4 && todaysEntries[3].time_out) {
+                    status = 'Timed Out';
+                    const timeIn1 = new Date(todaysEntries[0].time_in!);
+                    const timeOut1 = new Date(todaysEntries[1].time_out!);
+                    const timeIn2 = new Date(todaysEntries[2].time_in!);
+                    const timeOut2 = new Date(todaysEntries[3].time_out!);
+                    lastEventTime = timeOut2;
+                    workDurationSeconds = ((timeOut1.getTime() - timeIn1.getTime()) + (timeOut2.getTime() - timeIn2.getTime())) / 1000;
+                }
+            }
+            
+            const liveStatus: LiveEmployeeStatus = {
+                profile: emp, status, todaysSchedule, lastEventTime, workDurationSeconds, breakTimeRemainingSeconds, timerDisplay: '', dtrEntries: todaysEntries
+            };
+            
+            liveStatus.timerDisplay = this.getTimerDisplay(liveStatus);
+            return liveStatus;
+        });
+        
+        this.liveEmployeeStatus.set(statuses);
+    } catch (e: any) {
+        this.analyticsError.set(e.message || 'Failed to load live data.');
+    } finally {
+        this.analyticsLoading.set(false);
+    }
+  }
+
+  private updateTimers(): void {
+    this.liveEmployeeStatus.update(statuses => 
+      statuses.map(s => {
+        const newStatus = { ...s };
+        if (newStatus.status === 'Timed In') {
+          newStatus.workDurationSeconds++;
+        } else if (newStatus.status === 'On Break') {
+          newStatus.breakTimeRemainingSeconds--;
+          if (newStatus.breakTimeRemainingSeconds < 0) {
+            newStatus.breakTimeRemainingSeconds = 0;
+          }
+        }
+        
+        newStatus.timerDisplay = this.getTimerDisplay(newStatus);
+        return newStatus;
+      })
+    );
+  }
+
+  private getTimerDisplay(status: LiveEmployeeStatus): string {
+    if (status.status === 'Timed In') {
+      return this.formatSeconds(status.workDurationSeconds);
+    }
+    if (status.status === 'On Break') {
+      return `Break: ${this.formatSeconds(status.breakTimeRemainingSeconds)}`;
+    }
+    if (status.status === 'Timed Out') {
+      return this.formatSeconds(status.workDurationSeconds);
+    }
+    return '--:--:--';
+  }
+
+  private formatSeconds(totalSeconds: number): string {
+    if (totalSeconds < 0) totalSeconds = 0;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  private formatTimeForDisplay(timeStr: string): string {
+    if (!timeStr) return '';
+    const [hours, minutes] = timeStr.split(':');
+    let h = parseInt(hours, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    h = h ? h : 12; // the hour '0' should be '12'
+    return `${h}:${minutes} ${ampm}`;
   }
 
   onEmployeeSaved(): void {

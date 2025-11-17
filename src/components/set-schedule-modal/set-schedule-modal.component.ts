@@ -51,7 +51,7 @@ export class SetScheduleModalComponent {
   selectedSchedule = signal<ScheduleTemplateKey>(this.scheduleTemplates[0]);
 
   // Data State
-  schedules = signal<Map<string, ScheduleTemplateKey>>(new Map()); // Key: 'userId-dateStr'
+  schedules = signal<Map<string, ScheduleTemplateKey>>(new Map()); // Key: 'userId|dateStr'
 
   isAllSelected = computed(() => {
     const employees = this.employees();
@@ -126,7 +126,7 @@ export class SetScheduleModalComponent {
         )?.[0] as ScheduleTemplateKey | undefined;
         
         if (templateKey) {
-          scheduleMap.set(`${s.user_id}-${s.date}`, templateKey);
+          scheduleMap.set(`${s.user_id}|${s.date}`, templateKey);
         }
       });
       this.schedules.set(scheduleMap);
@@ -164,7 +164,7 @@ export class SetScheduleModalComponent {
     this.schedules.update(currentMap => {
       const newMap = new Map(currentMap);
       this.selectedEmployeeIds().forEach(userId => {
-        const key = `${userId}-${dateStr}`;
+        const key = `${userId}|${dateStr}`;
         newMap.set(key, this.selectedSchedule());
       });
       return newMap;
@@ -176,7 +176,7 @@ export class SetScheduleModalComponent {
      this.schedules.update(currentMap => {
       const newMap = new Map(currentMap);
       this.selectedEmployeeIds().forEach(userId => {
-        const key = `${userId}-${dateStr}`;
+        const key = `${userId}|${dateStr}`;
         newMap.delete(key);
       });
       return newMap;
@@ -191,7 +191,7 @@ export class SetScheduleModalComponent {
       this.calendarDays().forEach(day => {
         if (day.isCurrentMonth && !day.isWeekend) {
           this.selectedEmployeeIds().forEach(userId => {
-            newMap.set(`${userId}-${day.dateStr}`, scheduleKey);
+            newMap.set(`${userId}|${day.dateStr}`, scheduleKey);
           });
         }
       });
@@ -204,7 +204,7 @@ export class SetScheduleModalComponent {
     const schedulesToUpsert: Omit<EmployeeSchedule, 'id' | 'created_at'>[] = [];
     
     this.schedules().forEach((templateKey, key) => {
-      const [user_id, date] = key.split('-');
+      const [user_id, date] = key.split('|');
       const template = SCHEDULE_TEMPLATES[templateKey];
       schedulesToUpsert.push({
         user_id,

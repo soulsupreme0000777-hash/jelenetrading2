@@ -113,11 +113,11 @@
 
                   <!-- Display assigned schedules -->
                   @for(emp of employees(); track emp.id) {
-                    @if(schedules().has(emp.id + '-' + day.dateStr)) {
+                    @if(schedules().has(emp.id + '|' + day.dateStr)) {
                       <div class="mt-1 p-0.5 rounded-sm text-[10px] truncate"
                           [style.background-color]="selectedEmployeeIds().has(emp.id) ? '#4f46e5' : '#e0e7ff'"
                           [style.color]="selectedEmployeeIds().has(emp.id) ? 'white' : '#4338ca'"
-                          [title]="emp.first_name + ' ' + emp.last_name + ': ' + schedules().get(emp.id + '-' + day.dateStr)">
+                          [title]="emp.first_name + ' ' + emp.last_name + ': ' + schedules().get(emp.id + '|' + day.dateStr)">
                           {{ emp.first_name }}
                       </div>
                     }
