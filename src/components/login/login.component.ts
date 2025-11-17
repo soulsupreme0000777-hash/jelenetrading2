@@ -1,22 +1,15 @@
-import { Component, ChangeDetectionStrategy, signal, inject, effect, OnDestroy, viewChild, ElementRef, untracked } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, inject, effect, untracked } from '@angular/core';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { SupabaseService, Profile, DtrEntry } from '../../services/supabase.service';
-import { QrLoginSuccessModalComponent } from '../qr-login-success-modal/qr-login-success-modal.component';
-
-declare var jsQR: any;
+import { SupabaseService } from '../../services/supabase.service';
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, QrLoginSuccessModalComponent]
+  imports: [ReactiveFormsModule]
 })
-export class LoginComponent implements OnDestroy {
-  // View Children for QR Scanner
-  video = viewChild<ElementRef<HTMLVideoElement>>('video');
-  canvas = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
-
+export class LoginComponent {
   // Form Group for password login
   loginForm = new FormGroup({
     email: new FormControl('admin@gmail.com', [Validators.required, Validators.email]),
@@ -26,16 +19,6 @@ export class LoginComponent implements OnDestroy {
   // State Signals
   loading = signal(false);
   errorMessage = signal<string | null>(null);
-  viewMode = signal<'password' | 'qr'>('password');
-
-  // QR Success Modal State
-  isQrSuccessModalVisible = signal(false);
-  qrScannedProfile = signal<Profile | null>(null);
-  qrScannedDtrEntry = signal<DtrEntry | null>(null);
-
-  // Private properties for QR scanner
-  private stream: MediaStream | null = null;
-  private isScanning = false;
 
   // Services & Router
   private readonly supabaseService = inject(SupabaseService);
@@ -60,37 +43,11 @@ export class LoginComponent implements OnDestroy {
         this.loginForm.enable();
       }
     });
-
-    // Stop scanner when view mode is not 'qr'
-    effect((onCleanup) => {
-        const mode = this.viewMode();
-        if (mode !== 'qr') {
-            this.stopScanner();
-        }
-        onCleanup(() => this.stopScanner());
-    });
-
-    // Start scanner only when view mode is 'qr' AND the video element is ready.
-    effect(() => {
-      const videoElRef = this.video();
-      if (this.viewMode() === 'qr' && videoElRef) {
-        this.startScanner();
-      }
-    }, { allowSignalWrites: true });
-  }
-
-  ngOnDestroy(): void {
-    this.stopScanner();
   }
 
   // Helper getters for template
   get email() { return this.loginForm.get('email'); }
   get password() { return this.loginForm.get('password'); }
-
-  setViewMode(mode: 'password' | 'qr'): void {
-    this.errorMessage.set(null); // Clear errors when switching modes
-    this.viewMode.set(mode);
-  }
 
   async onSubmit(): Promise<void> {
     if (this.loginForm.invalid) {
@@ -113,107 +70,5 @@ export class LoginComponent implements OnDestroy {
     } finally {
       this.loading.set(false);
     }
-  }
-
-  // --- QR Scanner Logic ---
-
-  private async startScanner(): Promise<void> {
-    try {
-      if (this.isScanning) { return; } // Prevent starting multiple times
-      if (this.stream) this.stopScanner(); // Ensure no existing stream
-      
-      const videoEl = this.video()?.nativeElement;
-      if (!videoEl || !navigator.mediaDevices?.getUserMedia) {
-        throw new Error('Camera not available or not supported by this browser.');
-      }
-      
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
-
-      videoEl.srcObject = this.stream;
-      videoEl.setAttribute('playsinline', 'true'); // Required for iOS
-      await videoEl.play();
-      
-      this.isScanning = true;
-      requestAnimationFrame(this.tick.bind(this));
-    } catch (err: any) {
-      console.error('Error starting scanner:', err);
-      this.errorMessage.set(err.message || 'Could not access the camera. Please check permissions.');
-      this.viewMode.set('password'); // Revert to password mode on error
-    }
-  }
-
-  private stopScanner(): void {
-    this.isScanning = false;
-    if (this.stream) {
-      this.stream.getTracks().forEach(track => track.stop());
-      this.stream = null;
-    }
-    const videoEl = this.video()?.nativeElement;
-    if (videoEl) {
-        videoEl.srcObject = null;
-    }
-  }
-
-  private tick(): void {
-    if (!this.isScanning) return;
-
-    const videoEl = this.video()?.nativeElement;
-    const canvasEl = this.canvas()?.nativeElement;
-    
-    if (videoEl && videoEl.readyState === videoEl.HAVE_ENOUGH_DATA && canvasEl) {
-      const ctx = canvasEl.getContext('2d', { willReadFrequently: true });
-      if (ctx) {
-        canvasEl.height = videoEl.videoHeight;
-        canvasEl.width = videoEl.videoWidth;
-        ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-        
-        const imageData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'dontInvert',
-        });
-        
-        if (code) {
-          this.isScanning = false; // Stop further scanning
-          this.handleQrCodeLogin(code.data);
-          return; // Exit the loop
-        }
-      }
-    }
-    
-    requestAnimationFrame(this.tick.bind(this));
-  }
-  
-  private async handleQrCodeLogin(qrData: string): Promise<void> {
-    this.loading.set(true);
-    this.errorMessage.set(null);
-    this.stopScanner(); // Stop the camera feed
-
-    try {
-      const parsedData = JSON.parse(qrData);
-      if (!parsedData.userId) {
-        throw new Error('Invalid QR code format.');
-      }
-      
-      const { profile, dtrEntry } = await this.supabaseService.handleQrCodeLogin(parsedData.userId);
-
-      this.qrScannedProfile.set(profile);
-      this.qrScannedDtrEntry.set(dtrEntry);
-      this.isQrSuccessModalVisible.set(true);
-
-    } catch (error: any) {
-      console.error('QR Login Error:', error);
-      this.errorMessage.set(error.message || 'Failed to process QR code.');
-    } finally {
-      this.loading.set(false);
-    }
-  }
-  
-  closeQrSuccessModal(): void {
-    this.isQrSuccessModalVisible.set(false);
-    this.qrScannedProfile.set(null);
-    this.qrScannedDtrEntry.set(null);
-    this.setViewMode('password'); // Go back to password login after modal closes
   }
 }

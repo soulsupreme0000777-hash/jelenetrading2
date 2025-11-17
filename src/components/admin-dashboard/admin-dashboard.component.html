@@ -19,7 +19,7 @@
     <!-- Navigation -->
     <nav class="flex-1 px-4 py-4 space-y-1">
         <a href="#" (click)="setActiveTab('employees'); isSidebarOpen.set(false); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'employees'" [class.text-white]="activeTab() === 'employees'" [class.hover:bg-gray-100]="activeTab() !== 'employees'" [class.dark:hover:bg-gray-700]="activeTab() !== 'employees'">
-           <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.67c.625-.934 1-2.122 1-3.417v-.175a6.375 6.375 0 015.375-6.232A12.318 12.318 0 0118.375 3.625c-2.331 0-4.512.645-6.374 1.766l-.001.109a6.375 6.375 0 01-11.964 4.67c-.625.934-1 2.122-1 3.417v.175a6.375 6.375 0 01-5.375 6.232A12.318 12.318 0 016.625 19.375c2.331 0 4.512-.645 6.374-1.766l.001.109z" /></svg>
+           <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.67c.625-.934 1-2.122 1-3.417v-.175a6.375 6.375 0 015.375-6.232A12.318 12.318 0 0118.375 3.625c-2.331 0-4.512.645-6.374 1.766l-.001.109a6.375 6.375 0 01-11.964 4.67c-.625.934-1 2.122-1-3.417v.175a6.375 6.375 0 01-5.375 6.232A12.318 12.318 0 016.625 19.375c2.331 0 4.512-.645 6.374-1.766l.001.109z" /></svg>
            <span class="ml-3 font-medium">Employees</span>
         </a>
         <a href="#" (click)="setActiveTab('dtr'); isSidebarOpen.set(false); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'dtr'" [class.text-white]="activeTab() === 'dtr'" [class.hover:bg-gray-100]="activeTab() !== 'dtr'" [class.dark:hover:bg-gray-700]="activeTab() !== 'dtr'">
@@ -28,11 +28,7 @@
         </a>
         <a href="#" (click)="setActiveTab('payroll'); isSidebarOpen.set(false); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'payroll'" [class.text-white]="activeTab() === 'payroll'" [class.hover:bg-gray-100]="activeTab() !== 'payroll'" [class.dark:hover:bg-gray-700]="activeTab() !== 'payroll'">
            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
-           <span class="ml-3 font-medium">Payroll</span>
-        </a>
-        <a href="#" (click)="setActiveTab('departments'); isSidebarOpen.set(false); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'departments'" [class.text-white]="activeTab() === 'departments'" [class.hover:bg-gray-100]="activeTab() !== 'departments'" [class.dark:hover:bg-gray-700]="activeTab() !== 'departments'">
-           <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.375M9 12h6.375M9 17.25h6.375" /></svg>
-           <span class="ml-3 font-medium">Departments</span>
+           <span class="ml-3 font-medium">Payroll History</span>
         </a>
         <a href="#" (click)="setActiveTab('analytics'); isSidebarOpen.set(false); $event.preventDefault()" class="flex items-center px-4 py-2.5 rounded-lg transition-colors duration-200" [class.bg-indigo-600]="activeTab() === 'analytics'" [class.text-white]="activeTab() === 'analytics'" [class.hover:bg-gray-100]="activeTab() !== 'analytics'" [class.dark:hover:bg-gray-700]="activeTab() !== 'analytics'">
           <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 100 15 7.5 7.5 0 000-15z" /><path stroke-linecap="round" stroke-linejoin="round" d="M12.75 9.75v3.75m0 0H15m-2.25 0H9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -53,7 +49,37 @@
   </div>
 
   <!-- Main Content -->
-  <main class="flex-1 p-6 sm:p-8 lg:p-10 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+  <main class="flex-1 p-6 sm:p-8 lg:p-10 overflow-y-auto bg-gray-50 dark:bg-gray-900 relative">
+    <!-- Notification -->
+    @if(notification(); as notif) {
+      <div 
+        class="absolute top-6 right-6 z-50 p-4 rounded-lg shadow-lg border-l-4"
+        [class.bg-green-100]="notif.type === 'success'" [class.border-green-500]="notif.type === 'success'" [class.text-green-800]="notif.type === 'success'"
+        [class.dark:bg-green-900/40]="notif.type === 'success'" [class.dark:text-green-200]="notif.type === 'success'"
+        [class.bg-red-100]="notif.type === 'error'" [class.border-red-500]="notif.type === 'error'" [class.text-red-800]="notif.type === 'error'"
+        [class.dark:bg-red-900/40]="notif.type === 'error'" [class.dark:text-red-200]="notif.type === 'error'"
+        role="alert">
+        <div class="flex">
+          <div class="py-1">
+            <svg class="h-6 w-6" 
+                 [class.text-green-500]="notif.type === 'success'" 
+                 [class.text-red-500]="notif.type === 'error'" 
+                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              @if(notif.type === 'success') {
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              } @else {
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              }
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="font-bold">{{ notif.type === 'success' ? 'Success' : 'Error' }}</p>
+            <p class="text-sm">{{ notif.message }}</p>
+          </div>
+        </div>
+      </div>
+    }
+
     <!-- Main Header -->
     <div class="flex items-center mb-4">
       <!-- Burger Button -->
@@ -64,43 +90,39 @@
       </button>
       
       <!-- Header Content -->
-      <div class="flex-1 flex justify-between items-center">
+      <div class="flex-1 flex justify-between items-center flex-wrap gap-4">
         @switch (activeTab()) {
             @case('employees') {
                 <div>
                     <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Employee Management</h1>
                     <p class="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">View, add, and manage all employees.</p>
                 </div>
-                <button (click)="openAddEmployeeModal()" class="flex items-center gap-2 px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
-                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                    <span class="hidden sm:inline">Add Employee</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button (click)="toggleTimeClockMode()" class="flex items-center gap-2 px-3 sm:px-4 py-2 bg-teal-600 text-white rounded-lg shadow-md hover:bg-teal-700 transition-colors">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75ZM6.75 16.5h.75v.75h-.75v-.75ZM16.5 6.75h.75v.75h-.75v-.75ZM13.5 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 16.5h.75v.75h-.75v-.75Z" /></svg>
+                        <span class="hidden sm:inline">Time Clock</span>
+                    </button>
+                    <button (click)="isSetScheduleModalVisible.set(true)" class="flex items-center gap-2 px-3 sm:px-4 py-2 bg-slate-600 text-white rounded-lg shadow-md hover:bg-slate-700 transition-colors">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0h18M12 12.75h.008v.008H12v-.008Z" /></svg>
+                        <span class="hidden sm:inline">Set Schedules</span>
+                    </button>
+                    <button (click)="openAddEmployeeModal()" class="flex items-center gap-2 px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                        <span class="hidden sm:inline">Add Employee</span>
+                    </button>
+                </div>
             }
             @case('dtr') {
                 <div>
-                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">DTR Logs</h1>
-                    <p class="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">Review all employee clock-in and clock-out events.</p>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">DTR Logs & Payroll</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">Review time logs and run payroll for unprocessed periods.</p>
                 </div>
             }
             @case('payroll') {
                 <div>
                     <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Payroll History</h1>
-                    <p class="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">View past payrolls or run a new one.</p>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">View historical payroll records.</p>
                 </div>
-                <button (click)="isRunPayrollModalVisible.set(true)" class="flex items-center gap-2 px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
-                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span class="hidden sm:inline">Run New Payroll</span>
-                </button>
-            }
-            @case('departments') {
-                <div>
-                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Departments</h1>
-                    <p class="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">Manage company departments and roles.</p>
-                </div>
-                <button (click)="openAddDepartmentModal()" class="flex items-center gap-2 px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition-colors">
-                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                    <span class="hidden sm:inline">Add Department</span>
-                </button>
             }
             @case('analytics') {
                 <div>
@@ -168,10 +190,8 @@
                   <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Employee ID</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Full Name</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Department</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Branch</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Position</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Phone</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
@@ -180,10 +200,8 @@
                     <tr>
                       <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600 dark:text-gray-400">{{ employee.employee_id }}</td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ employee.first_name }} {{ employee.last_name }}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ employee.departments?.name || employee.position }}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ employee.departments?.name ? employee.position : '' }}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ employee.email }}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ employee.mobile_number }}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 capitalize">{{ employee.branch }}</td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 capitalize">{{ employee.position }}</td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div class="flex items-center gap-1">
                           <button (click)="openIdCardModal(employee)" class="p-2 rounded-full text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" title="Show ID Card">
@@ -195,17 +213,17 @@
                           <button (click)="openEditEmployeeModal(employee)" class="p-2 rounded-full text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors" title="Edit Employee">
                              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
                           </button>
-                          <button (click)="openDeleteEmployeeConfirmation(employee)" class="p-2 rounded-full text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600 dark:hover:text-red-300 transition-colors" title="Deactivate Employee">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+                          <button (click)="openDeleteConfirmation(employee)" class="p-2 rounded-full text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600 dark:hover:text-red-300 transition-colors" title="Delete Employee">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
                           </button>
                         </div>
                       </td>
                     </tr>
                   } @empty {
                     @if (searchTerm()) {
-                      <tr><td colspan="7" class="text-center py-8 text-gray-500 dark:text-gray-400">No employees match your search for "{{ searchTerm() }}".</td></tr>
+                      <tr><td colspan="5" class="text-center py-8 text-gray-500 dark:text-gray-400">No employees match your search for "{{ searchTerm() }}".</td></tr>
                     } @else {
-                      <tr><td colspan="7" class="text-center py-8 text-gray-500 dark:text-gray-400">No employees found. Add one to get started.</td></tr>
+                      <tr><td colspan="5" class="text-center py-8 text-gray-500 dark:text-gray-400">No employees found. Add one to get started.</td></tr>
                     }
                   }
                 </tbody>
@@ -251,141 +269,135 @@
             <p class="font-bold">Error loading DTR logs:</p>
             <p>{{dtrError()}}</p>
           </div>
-        } @else if (groupedDtrEntries().length > 0) {
+        } @else if (groupedDtrPayPeriods().length > 0) {
           <div class="space-y-4">
-            @for(group of groupedDtrEntries(); track group.monthYearValue) {
+            @for(group of groupedDtrPayPeriods(); track group.id) {
               <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-                <button (click)="toggleDtrMonth(group.monthYearValue)" class="w-full flex justify-between items-center p-4 text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                  <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">{{ group.monthYearDisplay }} Logs</h3>
-                  <svg class="w-6 h-6 text-gray-500 dark:text-gray-400 transition-transform duration-300" [class.rotate-180]="openDtrMonths().has(group.monthYearValue)" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                     <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                  </svg>
+                <button (click)="toggleDtrPeriod(group.id)" class="w-full flex justify-between items-center p-4 text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                  <div class="flex-1 flex items-center gap-4">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">{{ group.display }}</h3>
+                    <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full"
+                          [class.bg-green-100]="group.payrollStatus === 'Processed'" [class.text-green-800]="group.payrollStatus === 'Processed'"
+                          [class.dark:bg-green-900/50]="group.payrollStatus === 'Processed'" [class.dark:text-green-300]="group.payrollStatus === 'Processed'"
+                          [class.bg-yellow-100]="group.payrollStatus === 'Not Processed'" [class.text-yellow-800]="group.payrollStatus === 'Not Processed'"
+                          [class.dark:bg-yellow-900/50]="group.payrollStatus === 'Not Processed'" [class.dark:text-yellow-300]="group.payrollStatus === 'Not Processed'">
+                      {{ group.payrollStatus === 'Processed' ? 'Payroll Processed' : 'Not Processed' }}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    @if (group.payrollStatus === 'Not Processed') {
+                      <button (click)="openRunPayrollForPeriod(group); $event.stopPropagation()" class="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md shadow-sm hover:bg-indigo-700">
+                        Run Payroll
+                      </button>
+                    } @else {
+                      <button (click)="exportDtrPeriodToCsv(group); $event.stopPropagation()" class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 dark:bg-gray-600 dark:text-white dark:border-gray-500">
+                        Export CSV
+                      </button>
+                    }
+                    <svg class="w-6 h-6 text-gray-500 dark:text-gray-400 transition-transform duration-300" [class.rotate-180]="openDtrPeriods().has(group.id)" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                       <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                  </div>
                 </button>
                 
-                @if(openDtrMonths().has(group.monthYearValue)) {
-                  <div class="p-4 border-t border-gray-200 dark:border-gray-700">
-                    @if (group.entries.length > 0) {
-                      <div class="overflow-x-auto">
-                        <table class="min-w-full">
+                @if(openDtrPeriods().has(group.id)) {
+                  <div class="p-4">
+                     <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                           <thead class="bg-gray-50 dark:bg-gray-700/50">
                             <tr>
                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Employee</th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Time In</th>
                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Time Out</th>
                             </tr>
                           </thead>
                           <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                             @for(entry of group.entries; track entry.id) {
+                            @for(entry of group.entries; track entry.id) {
                               <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{entry.profiles?.first_name}} {{entry.profiles?.last_name}}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{entry.time_in | date:'short'}}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{entry.time_out ? (entry.time_out | date:'short') : 'Not clocked out'}}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ entry.profiles?.first_name }} {{ entry.profiles?.last_name }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ entry.time_in | date:'mediumDate' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400 font-semibold">{{ entry.time_in | date:'mediumTime' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400 font-semibold">
+                                  @if(entry.time_out) {
+                                    {{ entry.time_out | date:'mediumTime' }}
+                                  } @else {
+                                    <span class="text-gray-500">In Progress</span>
+                                  }
+                                </td>
                               </tr>
                             }
                           </tbody>
                         </table>
                       </div>
-                    } @else {
-                      <p class="text-center py-4 text-gray-500 dark:text-gray-400">No entries match your search for this month.</p>
-                    }
                   </div>
                 }
               </div>
             }
           </div>
         } @else {
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center text-gray-500 dark:text-gray-400">
-            No DTR entries have been recorded yet.
+           <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center text-gray-500 dark:text-gray-400">
+            No DTR entries found. Time-in/out data will appear here once recorded.
           </div>
         }
       }
-      @case ('payroll') {
-         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-          @if(payrollsLoading()){ <p class="text-gray-700 dark:text-gray-300 text-center p-8">Loading payrolls...</p> }
-          @else if(payrollsError()){ <p class="text-red-500 text-center p-8">{{payrollsError()}}</p> }
-          @else {
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700/50">
-                  <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Employee</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Pay Period</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Net Pay</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  @for(payroll of payrolls(); track payroll.id) {
-                    <tr>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{payroll.profiles?.first_name}} {{payroll.profiles?.last_name}}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{payroll.pay_period_start | date:'shortDate'}} - {{payroll.pay_period_end | date:'shortDate'}}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{payroll.net_pay | currency:'PHP':'symbol':'1.2-2'}}</td>
-                      <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full"
-                          [class.bg-yellow-100]="payroll.status === 'Delayed'" [class.text-yellow-800]="payroll.status === 'Delayed'"
-                          [class.dark:bg-yellow-900/50]="payroll.status === 'Delayed'" [class.dark:text-yellow-300]="payroll.status === 'Delayed'"
-                          [class.bg-red-100]="payroll.status === 'Unpaid'" [class.text-red-800]="payroll.status === 'Unpaid'"
-                          [class.dark:bg-red-900/50]="payroll.status === 'Unpaid'" [class.dark:text-red-300]="payroll.status === 'Unpaid'"
-                          [class.bg-green-100]="payroll.status === 'Paid'" [class.text-green-800]="payroll.status === 'Paid'"
-                          [class.dark:bg-green-900/50]="payroll.status === 'Paid'" [class.dark:text-green-300]="payroll.status === 'Paid'">
-                          {{ payroll.status }}
-                        </span>
-                      </td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm">
-                        <select [value]="payroll.status" (change)="onPayrollStatusChange(payroll.id, $event)" class="block w-full pl-3 pr-8 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
-                          <option value="Paid">Paid</option>
-                          <option value="Delayed">Delayed</option>
-                          <option value="Unpaid">Unpaid</option>
-                        </select>
-                      </td>
-                    </tr>
-                  } @empty {
-                    <tr><td colspan="5" class="text-center py-8 text-gray-500 dark:text-gray-400">No payrolls found.</td></tr>
-                  }
-                </tbody>
-              </table>
+      @case('payroll') {
+        <div class="space-y-4">
+          @if(payrollsLoading()){
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center text-gray-500 dark:text-gray-400">Loading payroll history...</div>
+          } @else if(payrollsError()){
+            <div class="bg-red-100 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-300 p-4 rounded-md" role="alert">
+              <p class="font-bold">Error loading payrolls:</p>
+              <p>{{payrollsError()}}</p>
             </div>
-          }
-        </div>
-      }
-      @case ('departments') {
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-          @if(departmentsLoading()){ <p class="text-gray-700 dark:text-gray-300 text-center p-8">Loading departments...</p> }
-          @else if(departmentsError()){ <p class="text-red-500 text-center p-8">{{departmentsError()}}</p> }
-          @else {
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700/50">
-                  <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Work Hours</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Lateness Rules</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Deduction Rate</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                   @for(dept of departments(); track dept.id) {
-                    <tr>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{dept.name}}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{dept.work_start_time}} - {{dept.work_end_time}}</td>
-                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        Grace Period: {{dept.grace_period_minutes}} min
-                       </td>
-                       <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-600 dark:text-gray-300">
-                        {{dept.deduction_rate_per_minute | currency:'PHP'}} / min
-                       </td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-4">
-                        <button (click)="openEditDepartmentModal(dept)" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200">Edit</button>
-                        <button (click)="openDeleteDepartmentConfirmation(dept)" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200">Delete</button>
-                      </td>
-                    </tr>
-                  } @empty {
-                     <tr><td colspan="5" class="text-center py-8 text-gray-500 dark:text-gray-400">No departments found.</td></tr>
-                  }
-                </tbody>
-              </table>
+          } @else if (groupedPayrolls().length > 0) {
+            @for(group of groupedPayrolls(); track group.monthYearValue) {
+              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                <button (click)="togglePayrollMonth(group.monthYearValue)" class="w-full flex justify-between items-center p-4 text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                  <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">{{ group.monthYearDisplay }}</h3>
+                  <svg class="w-6 h-6 text-gray-500 dark:text-gray-400 transition-transform duration-300" [class.rotate-180]="openPayrollMonths().has(group.monthYearValue)" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                     <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </button>
+                @if(openPayrollMonths().has(group.monthYearValue)) {
+                  <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                       <thead class="bg-gray-50 dark:bg-gray-700/50">
+                          <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Employee</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Pay Period</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Net Pay</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                          </tr>
+                        </thead>
+                         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                          @for(payroll of group.payrolls; track payroll.id) {
+                            <tr>
+                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ payroll.profiles?.first_name }} {{ payroll.profiles?.last_name }}</td>
+                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ payroll.pay_period_start | date:'MMM d' }} - {{ payroll.pay_period_end | date:'MMM d, y' }}</td>
+                              <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 dark:text-gray-200">{{ payroll.net_pay | currency:'PHP' }}</td>
+                              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                <select [value]="payroll.status" (change)="onPayrollStatusChange(payroll.id, $event)"
+                                        class="text-xs font-semibold rounded-full border-none focus:ring-0 appearance-none py-1 pl-2.5 pr-8"
+                                        [class.bg-green-100]="payroll.status === 'Paid'" [class.text-green-800]="payroll.status === 'Paid'" [class.dark:bg-green-900/50]="payroll.status === 'Paid'" [class.dark:text-green-300]="payroll.status === 'Paid'"
+                                        [class.bg-yellow-100]="payroll.status === 'Delayed'" [class.text-yellow-800]="payroll.status === 'Delayed'" [class.dark:bg-yellow-900/50]="payroll.status === 'Delayed'" [class.dark:text-yellow-300]="payroll.status === 'Delayed'"
+                                        [class.bg-red-100]="payroll.status === 'Unpaid'" [class.text-red-800]="payroll.status === 'Unpaid'" [class.dark:bg-red-900/50]="payroll.status === 'Unpaid'" [class.dark:text-red-300]="payroll.status === 'Unpaid'">
+                                    <option value="Paid">Paid</option>
+                                    <option value="Delayed">Delayed</option>
+                                    <option value="Unpaid">Unpaid</option>
+                                </select>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center text-gray-500 dark:text-gray-400">
+              No payroll history found.
             </div>
           }
         </div>
@@ -393,92 +405,115 @@
       @case('analytics') {
         <div class="space-y-8">
           <!-- Stat Cards -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
-              <div class="bg-blue-100 dark:bg-blue-900/50 p-3 rounded-full"><svg class="w-6 h-6 text-blue-600 dark:text-blue-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.5-2.962a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.5-2.962a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg></div>
-              <div><p class="text-sm text-gray-500 dark:text-gray-400">Total Employees</p><p class="text-2xl font-bold text-gray-900 dark:text-white">{{ totalEmployees() }}</p></div>
-            </div>
-             <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
-              <div class="bg-gray-100 dark:bg-gray-700 p-3 rounded-full"><svg class="w-6 h-6 text-gray-600 dark:text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg></div>
-              <div><p class="text-sm text-gray-500 dark:text-gray-400">Absent Employees</p><p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analyticsReport().absentCount }}</p></div>
+              <div class="bg-blue-100 dark:bg-blue-900/50 p-3 rounded-full"><svg class="w-8 h-8 text-blue-600 dark:text-blue-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m-7.5-2.962A3.75 3.75 0 0 1 15 12a3.75 3.75 0 0 1-2.25 3.512M7.5 12a3.75 3.75 0 0 1 6-2.062M3.75 12a3.75 3.75 0 0 1 6-2.062M3 18.75a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72M12 12.75a3.75 3.75 0 0 1-7.5 0 .375.375 0 0 1 .75 0a3 3 0 0 0 6 0 .375.375 0 0 1 .75 0Z" /></svg></div>
+              <div><p class="text-sm text-gray-500 dark:text-gray-400">Total Employees</p><p class="text-3xl font-bold text-gray-900 dark:text-white">{{ totalEmployees() }}</p></div>
             </div>
             <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
-              <div class="bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-full"><svg class="w-6 h-6 text-yellow-600 dark:text-yellow-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
-              <div><p class="text-sm text-gray-500 dark:text-gray-400">Late Arrivals</p><p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analyticsReport().lateCount }}</p></div>
+              <div class="bg-red-100 dark:bg-red-900/50 p-3 rounded-full"><svg class="w-8 h-8 text-red-600 dark:text-red-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg></div>
+              <div><p class="text-sm text-gray-500 dark:text-gray-400">Absences This Month</p><p class="text-3xl font-bold text-gray-900 dark:text-white">{{ analyticsReport().absentCount }}</p></div>
             </div>
              <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
-              <div class="bg-orange-100 dark:bg-orange-900/50 p-3 rounded-full"><svg class="w-6 h-6 text-orange-600 dark:text-orange-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9.75v3.75m-3.75 0H15M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
-              <div><p class="text-sm text-gray-500 dark:text-gray-400">Early Departures</p><p class="text-2xl font-bold text-gray-900 dark:text-white">{{ analyticsReport().earlyCount }}</p></div>
+              <div class="bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-full"><svg class="w-8 h-8 text-yellow-600 dark:text-yellow-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg></div>
+              <div><p class="text-sm text-gray-500 dark:text-gray-400">Late Arrivals</p><p class="text-3xl font-bold text-gray-900 dark:text-white">{{ analyticsReport().lateCount }}</p></div>
             </div>
-          </div>
-          <!-- Lateness Chart -->
-          <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-6">Daily Late Arrivals this Month</h3>
-            @if (analyticsLoading()) {
-              <div class="flex items-center justify-center h-64"><p class="text-gray-500 dark:text-gray-400">Loading chart data...</p></div>
-            } @else if(analyticsError()) {
-              <div class="flex items-center justify-center h-64"><p class="text-red-500 dark:text-red-400">{{ analyticsError() }}</p></div>
-            } @else if (analyticsReport().lateByDay.length > 0) {
-              <div class="w-full h-72 flex items-end gap-2 border-b-2 border-l-2 border-gray-200 dark:border-gray-700 p-4">
-                @for (item of analyticsReport().lateByDay; track item.day) {
-                  <div class="flex-1 h-full flex flex-col justify-end items-center relative bar-container">
-                    <div class="chart-bar w-3/4 bg-indigo-500 hover:bg-indigo-600 rounded-t-md" [style.height.%]="(item.count / analyticsReport().maxLateCount) * 100"></div>
-                    <span class="text-xs mt-1 text-gray-500 dark:text-gray-400">{{ item.day }}</span>
-                    <div class="bar-tooltip absolute bottom-full mb-2 w-max px-2 py-1 bg-gray-900 text-white text-xs rounded-md shadow-lg">
-                      {{ item.count }} late
-                    </div>
-                  </div>
-                }
-              </div>
-            } @else {
-               <div class="flex items-center justify-center h-64"><p class="text-gray-500 dark:text-gray-400">No late arrival data for this month.</p></div>
-            }
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
+              <div class="bg-orange-100 dark:bg-orange-900/50 p-3 rounded-full"><svg class="w-8 h-8 text-orange-600 dark:text-orange-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9.75v-3.75m0 3.75c0 .375-.205.713-.538.937-1.125.75-2.875.75-4.063 0a1.125 1.125 0 0 1-.537-.937V6m0 3.75a3.75 3.75 0 1 1 5.125 2.637M12 9.75v-3.75m0 3.75a3.75 3.75 0 0 0 5.125 2.637M12 9.75v3.75m-5.125-2.637a3.75 3.75 0 0 1-5.125-2.637m10.25 5.274a3.75 3.75 0 0 0-5.125-2.637" /></svg></div>
+              <div><p class="text-sm text-gray-500 dark:text-gray-400">Early Departures</p><p class="text-3xl font-bold text-gray-900 dark:text-white">{{ analyticsReport().earlyCount }}</p></div>
+            </div>
           </div>
         </div>
       }
     }
   </main>
+  
+  <!-- Modals -->
+  <app-add-employee-modal 
+    [visible]="isAddEmployeeModalVisible()" 
+    [employeeToEdit]="employeeToEdit()"
+    [currentUserRole]="currentUserRole()"
+    (close)="closeEmployeeModal()"
+    (employeeSaved)="onEmployeeSaved()"
+  ></app-add-employee-modal>
+
+  <app-run-payroll-modal
+    [visible]="isRunPayrollModalVisible()"
+    [payPeriod]="selectedPayPeriod()"
+    (close)="closeRunPayrollModal()"
+    (payrollRun)="refreshPayrolls()"
+  ></app-run-payroll-modal>
+
+  <app-view-employee-modal
+    [visible]="isViewEmployeeModalVisible()"
+    [employee]="selectedEmployee()"
+    (close)="isViewEmployeeModalVisible.set(false)"
+  ></app-view-employee-modal>
+
+  <app-id-card-modal
+    [visible]="isIdCardModalVisible()"
+    [employee]="selectedEmployee()"
+    (close)="isIdCardModalVisible.set(false)"
+  ></app-id-card-modal>
+
+  <app-confirmation-modal
+    [visible]="isConfirmModalVisible()"
+    [title]="confirmModalConfig().title"
+    [message]="confirmModalConfig().message"
+    (close)="isConfirmModalVisible.set(false)"
+    (confirm)="confirmModalConfig().onConfirm()"
+  ></app-confirmation-modal>
+
+  <app-set-schedule-modal
+    [visible]="isSetScheduleModalVisible()"
+    [employees]="employees()"
+    (close)="isSetScheduleModalVisible.set(false)"
+  ></app-set-schedule-modal>
+
+  <!-- Time Clock Mode Overlay -->
+  @if(isTimeClockModeActive()) {
+    <div class="fixed inset-0 z-50 bg-gray-900/80 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+      <div class="relative w-full max-w-2xl bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700">
+        <div class="p-6 text-center border-b border-gray-700">
+          <h2 class="text-2xl font-bold text-white">Time Clock Mode</h2>
+          <p class="text-gray-400">Scan employee QR code to clock in/out.</p>
+        </div>
+        <div class="relative aspect-video bg-black">
+          <video #video class="w-full h-full object-cover"></video>
+          <canvas #canvas class="hidden"></canvas>
+
+          @if (lastScanResult(); as result) {
+            <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-8 animate-fade-in">
+                @if(result.type === 'in') {
+                    <span class="text-3xl font-bold text-green-400">Timed In</span>
+                } @else {
+                    <span class="text-3xl font-bold text-red-400">Timed Out</span>
+                }
+                <span class="mt-4 text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</span>
+                <span class="mt-2 text-2xl text-gray-300">{{ result.dtrEntry.time_in | date:'mediumTime' }}</span>
+            </div>
+          }
+
+          @if (scannerLoading()) {
+            <div class="absolute inset-0 flex items-center justify-center bg-black/70">
+              <svg class="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </div>
+          }
+           @if (scannerErrorMessage()) {
+             <div class="absolute inset-0 flex flex-col items-center justify-center bg-red-900/90 text-white p-8">
+                <h3 class="text-2xl font-bold">Scan Error</h3>
+                <p class="mt-2 text-red-200">{{ scannerErrorMessage() }}</p>
+            </div>
+          }
+
+        </div>
+        <div class="p-4 bg-gray-900/50">
+          <button (click)="toggleTimeClockMode()" class="w-full py-3 text-sm font-medium text-white bg-red-600 rounded-lg shadow-sm hover:bg-red-700">
+            Exit Time Clock Mode
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
 </div>
-
-<app-add-employee-modal 
-  [visible]="isAddEmployeeModalVisible()"
-  [departments]="departments()"
-  [currentUserRole]="currentUserRole()"
-  [employeeToEdit]="employeeToEdit()"
-  (close)="closeEmployeeModal()"
-  (employeeSaved)="refreshAllData()"
-></app-add-employee-modal>
-
-<app-add-department-modal
-  [visible]="isAddDepartmentModalVisible()"
-  [departmentToEdit]="departmentToEdit()"
-  (close)="closeDepartmentModal()"
-  (departmentSaved)="loadDepartments()"
-></app-add-department-modal>
-
-<app-run-payroll-modal
-  [visible]="isRunPayrollModalVisible()"
-  [departments]="departments()"
-  (close)="isRunPayrollModalVisible.set(false)"
-  (payrollRun)="refreshPayrolls()"
-></app-run-payroll-modal>
-
-<app-confirmation-modal
-  [visible]="isConfirmModalVisible()"
-  [title]="confirmModalConfig().title"
-  [message]="confirmModalConfig().message"
-  (close)="isConfirmModalVisible.set(false)"
-  (confirm)="confirmModalConfig().onConfirm()"
-></app-confirmation-modal>
-
-<app-view-employee-modal
-  [visible]="isViewEmployeeModalVisible()"
-  [employee]="selectedEmployee()"
-  (close)="isViewEmployeeModalVisible.set(false)"
-></app-view-employee-modal>
-
-<app-id-card-modal
-  [visible]="isIdCardModalVisible()"
-  [employee]="selectedEmployee()"
-  (close)="isIdCardModalVisible.set(false)"
-></app-id-card-modal>

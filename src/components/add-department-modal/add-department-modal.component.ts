@@ -1,6 +1,19 @@
 import { Component, ChangeDetectionStrategy, input, output, signal, effect, inject, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { SupabaseService, Department } from '../../services/supabase.service';
+// FIX: Removed `Department` from import as it is no longer exported from `SupabaseService`.
+import { SupabaseService } from '../../services/supabase.service';
+
+// FIX: Added local `Department` interface to resolve type errors.
+// This component appears to rely on deprecated functionality, as the concept of
+// a department has been merged into the Profile entity.
+interface Department {
+  id: number;
+  name: string;
+  work_start_time?: string | null;
+  work_end_time?: string | null;
+  grace_period_minutes?: number | null;
+  deduction_rate_per_minute?: number | null;
+}
 
 type ModalState = 'form' | 'loading' | 'error';
 
@@ -64,33 +77,11 @@ export class AddDepartmentModalComponent {
     this.modalState.set('loading');
     this.errorMessage.set(null);
 
-    try {
-      const departmentData = {
-        name: this.departmentName(),
-        work_start_time: this.workStartTime(),
-        work_end_time: this.workEndTime(),
-        grace_period_minutes: this.gracePeriodMinutes(),
-        deduction_rate_per_minute: this.deductionRatePerMinute(),
-      };
-
-      if (this.isEditMode()) {
-        const dept = this.departmentToEdit();
-        if (!dept) throw new Error('Department to edit not found.');
-        
-        const { error } = await this.supabaseService.updateDepartment(dept.id, departmentData);
-        if (error) throw error;
-      } else {
-        const { error } = await this.supabaseService.createDepartment(departmentData);
-        if (error) throw error;
-      }
-
-      this.departmentSaved.emit();
-      this.closeModal();
-
-    } catch (error: any) {
-      this.errorMessage.set(error.message || 'An unexpected error occurred.');
-      this.modalState.set('form'); // Revert to form on error
-    }
+    // FIX: The functionality for creating/updating departments has been removed.
+    // The related methods `createDepartment` and `updateDepartment` do not exist on the service.
+    // This displays an error message instead of attempting to call non-existent functions.
+    this.errorMessage.set('This feature has been deprecated and is no longer available.');
+    this.modalState.set('form');
   }
 
   closeModal(): void {

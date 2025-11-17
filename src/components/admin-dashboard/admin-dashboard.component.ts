@@ -1,15 +1,18 @@
-import { Component, ChangeDetectionStrategy, inject, signal, effect, computed } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, effect, computed, OnDestroy, viewChild, ElementRef } from '@angular/core';
 import { Router } from '@angular/router';
-import { SupabaseService, Profile, DtrEntry, Payroll, Department, SalaryRule } from '../../services/supabase.service';
+import { SupabaseService, Profile, DtrEntry, Payroll, SalaryRule, EmployeeStatus } from '../../services/supabase.service';
 import { AddEmployeeModalComponent } from '../add-employee-modal/add-employee-modal.component';
-import { AddDepartmentModalComponent } from '../add-department-modal/add-department-modal.component';
 import { RunPayrollModalComponent } from '../run-payroll-modal/run-payroll-modal.component';
 import { ConfirmationModalComponent } from '../confirmation-modal/confirmation-modal.component';
 import { DatePipe, CurrencyPipe } from '@angular/common';
 import { ViewEmployeeModalComponent } from '../view-employee-modal/view-employee-modal.component';
 import { IdCardModalComponent } from '../id-card-modal/id-card-modal.component';
+import { SetScheduleModalComponent } from '../set-schedule-modal/set-schedule-modal.component';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
-type AdminTab = 'employees' | 'dtr' | 'payroll' | 'departments' | 'analytics';
+declare var jsQR: any;
+
+type AdminTab = 'employees' | 'dtr' | 'payroll' | 'analytics';
 
 interface ConfirmModalConfig {
   title: string;
@@ -25,12 +28,28 @@ interface AnalyticsReport {
   maxLateCount: number;
 }
 
-interface DtrGroup {
-  monthYearDisplay: string; // e.g., "October 2025"
-  monthYearValue: string; // e.g., "2025-10" for unique key
-  entries: (DtrEntry & { profiles: Profile })[];
+interface DtrPayPeriodGroup {
+  id: string; // e.g., "2023-10-16_2023-11-15"
+  display: string; // e.g., "October 16 - November 15, 2023"
+  payPeriodStart: Date;
+  payPeriodEnd: Date;
+  entries: (DtrEntry & { profiles: Profile | null })[];
+  payrollStatus: 'Processed' | 'Not Processed';
 }
 
+interface PayrollGroup {
+  monthYearDisplay: string; // e.g., "December 2023"
+  monthYearValue: string; // e.g., "2023-12"
+  payrolls: (Payroll & { profiles: Profile | null })[];
+}
+
+type Notification = { type: 'success' | 'error'; message: string };
+
+const BIRTH_MONTH_BONUS = {
+  'branch officer': 1200,
+  'team leader': 1000,
+  'regular staff': 500,
+} as const;
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -39,22 +58,26 @@ interface DtrGroup {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     AddEmployeeModalComponent, 
-    AddDepartmentModalComponent, 
     RunPayrollModalComponent, 
     ConfirmationModalComponent, 
     ViewEmployeeModalComponent,
     IdCardModalComponent,
+    SetScheduleModalComponent,
     DatePipe, 
     CurrencyPipe
   ],
 })
-export class AdminDashboardComponent {
+export class AdminDashboardComponent implements OnDestroy {
   private readonly supabaseService = inject(SupabaseService);
   private readonly router: Router = inject(Router);
+  private realtimeChannel: RealtimeChannel | null = null;
+  private notificationTimer: any;
 
   readonly currentUserRole = this.supabaseService.currentUserRole;
   activeTab = signal<AdminTab>('employees');
   isSidebarOpen = signal(false);
+  notification = signal<Notification | null>(null);
+  readonly currentYear = new Date().getFullYear();
 
   // Employee Search & Sort
   searchTerm = signal<string>('');
@@ -64,6 +87,18 @@ export class AdminDashboardComponent {
   employeesLoading = signal(true);
   employeesError = signal<string | null>(null);
   
+  // --- Time Clock Mode Signals & Properties ---
+  video = viewChild<ElementRef<HTMLVideoElement>>('video');
+  canvas = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
+  isTimeClockModeActive = signal(false);
+  scannerLoading = signal(false);
+  scannerErrorMessage = signal<string | null>(null);
+  lastScanResult = signal<{ profile: Profile; dtrEntry: DtrEntry; type: 'in' | 'out' } | null>(null);
+
+  private stream: MediaStream | null = null;
+  private isScanning = false;
+  private scanResultTimer: any;
+
   filteredEmployees = computed(() => {
     const term = this.searchTerm().toLowerCase().trim();
     const sortOption = this.employeeSortOption();
@@ -74,10 +109,11 @@ export class AdminDashboardComponent {
       (emp.first_name?.toLowerCase().includes(term)) ||
       (emp.middle_name?.toLowerCase().includes(term)) ||
       (emp.last_name?.toLowerCase().includes(term)) ||
-      (emp.email?.toLowerCase().includes(term))
+      (emp.email?.toLowerCase().includes(term)) ||
+      (emp.branch?.toLowerCase().includes(term))
     );
 
-    return filtered.sort((a, b) => {
+    const sorted = filtered.sort((a, b) => {
       switch(sortOption) {
         case 'lastNameAsc':
           return (a.last_name || '').localeCompare(b.last_name || '');
@@ -90,44 +126,69 @@ export class AdminDashboardComponent {
           return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       }
     });
+
+    return sorted;
   });
 
   // DTR Signals
   dtrSearchTerm = signal<string>('');
   dtrSortOption = signal<'newest' | 'oldest' | 'nameAsc' | 'nameDesc'>('newest');
-  dtrEntries = signal<(DtrEntry & { profiles: Profile })[]>([]);
+  dtrEntries = signal<(DtrEntry & { profiles: Profile | null })[]>([]);
   dtrLoading = signal(true);
   dtrError = signal<string | null>(null);
-  openDtrMonths = signal(new Set<string>()); // To track open accordions
+  openDtrPeriods = signal(new Set<string>()); // To track open accordions
   
-  groupedDtrEntries = computed<DtrGroup[]>(() => {
+  groupedDtrPayPeriods = computed<DtrPayPeriodGroup[]>(() => {
+    const allDtr = this.dtrEntries();
+    const allPayrolls = this.payrolls();
     const term = this.dtrSearchTerm().toLowerCase().trim();
     const sortOption = this.dtrSortOption();
-    const allEntries = this.dtrEntries();
 
-    if (!allEntries.length) {
-      return [];
+    if (!allDtr.length) return [];
+
+    const dtrByPeriod: Record<string, DtrPayPeriodGroup> = {};
+
+    for (const entry of allDtr) {
+        if (!entry.time_in) continue;
+        const entryDate = new Date(entry.time_in);
+        const day = entryDate.getUTCDate();
+        let month = entryDate.getUTCMonth();
+        let year = entryDate.getUTCFullYear();
+
+        let periodStart: Date;
+        let periodEnd: Date;
+
+        if (day >= 16) {
+            periodStart = new Date(Date.UTC(year, month, 16));
+            periodEnd = new Date(Date.UTC(year, month + 1, 15, 23, 59, 59, 999));
+        } else {
+            periodStart = new Date(Date.UTC(year, month - 1, 16));
+            periodEnd = new Date(Date.UTC(year, month, 15, 23, 59, 59, 999));
+        }
+
+        const periodId = `${periodStart.toISOString().slice(0, 10)}_${periodEnd.toISOString().slice(0, 10)}`;
+
+        if (!dtrByPeriod[periodId]) {
+            const periodStartStr = periodStart.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+            const periodEndStr = periodEnd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            
+            const isProcessed = allPayrolls.some(p => p.pay_period_start.startsWith(periodStart.toISOString().slice(0, 10)));
+            
+            dtrByPeriod[periodId] = {
+                id: periodId,
+                display: `${periodStartStr} - ${periodEndStr}`,
+                payPeriodStart: periodStart,
+                payPeriodEnd: periodEnd,
+                entries: [],
+                payrollStatus: isProcessed ? 'Processed' : 'Not Processed'
+            };
+        }
+        dtrByPeriod[periodId].entries.push(entry);
     }
+    
+    const sortedGroups = Object.values(dtrByPeriod).sort((a, b) => b.payPeriodStart.getTime() - a.payPeriodStart.getTime());
 
-    // 1. Group entries by month.
-    const groups: Record<string, DtrGroup> = {};
-    for (const entry of allEntries) {
-      const date = new Date(entry.time_in!);
-      const monthYearValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      if (!groups[monthYearValue]) {
-        groups[monthYearValue] = {
-          monthYearDisplay: date.toLocaleString('default', { month: 'long', year: 'numeric' }),
-          monthYearValue: monthYearValue,
-          entries: []
-        };
-      }
-      groups[monthYearValue].entries.push(entry);
-    }
-
-    // 2. Convert to array and sort groups (newest first)
-    const sortedGroups = Object.values(groups).sort((a, b) => b.monthYearValue.localeCompare(a.monthYearValue));
-
-    // 3. Filter and sort entries within each group
+    // Filter and sort entries within each group
     return sortedGroups.map(group => {
       // Filter
       const filteredEntries = group.entries.filter(entry => {
@@ -158,16 +219,51 @@ export class AdminDashboardComponent {
       });
       
       return { ...group, entries: sortedAndFilteredEntries };
-    });
+    }).filter(group => group.entries.length > 0);
   });
 
-  payrolls = signal<(Payroll & { profiles: Profile })[]>([]);
+  // Payroll Signals
+  payrolls = signal<(Payroll & { profiles: Profile | null })[]>([]);
   payrollsLoading = signal(true);
   payrollsError = signal<string | null>(null);
+  openPayrollMonths = signal(new Set<string>());
+  selectedPayPeriod = signal<{start: Date, end: Date} | null>(null);
 
-  departments = signal<Department[]>([]);
-  departmentsLoading = signal(true);
-  departmentsError = signal<string | null>(null);
+
+  groupedPayrolls = computed<PayrollGroup[]>(() => {
+    const allPayrolls = this.payrolls();
+    if (!allPayrolls.length) {
+      return [];
+    }
+
+    // 1. Group payrolls by month based on pay_period_end
+    const groups: Record<string, PayrollGroup> = {};
+    for (const payroll of allPayrolls) {
+      const date = new Date(payroll.pay_period_end);
+      const monthYearValue = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!groups[monthYearValue]) {
+        groups[monthYearValue] = {
+          monthYearDisplay: date.toLocaleString('default', { month: 'long', year: 'numeric' }),
+          monthYearValue: monthYearValue,
+          payrolls: []
+        };
+      }
+      groups[monthYearValue].payrolls.push(payroll);
+    }
+
+    // 2. Convert to array and sort groups (newest first)
+    const sortedGroups = Object.values(groups).sort((a, b) => b.monthYearValue.localeCompare(a.monthYearValue));
+
+    // 3. Sort entries within each group (by employee name)
+    return sortedGroups.map(group => {
+      const sortedPayrolls = group.payrolls.sort((a, b) => {
+          const nameA = `${a.profiles?.last_name || ''} ${a.profiles?.first_name || ''}`.trim();
+          const nameB = `${b.profiles?.last_name || ''} ${b.profiles?.first_name || ''}`.trim();
+          return nameA.localeCompare(nameB);
+      });
+      return { ...group, payrolls: sortedPayrolls };
+    });
+  });
 
   // --- Analytics Signals ---
   analyticsMonth = signal<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM format
@@ -194,106 +290,22 @@ export class AdminDashboardComponent {
   totalEmployees = computed(() => this.employees().length);
 
   analyticsReport = computed<AnalyticsReport>(() => {
-    const employees = this.employees();
-    const dtrEntries = this.dtrEntriesForAnalytics();
-    const departments = this.departments();
-    const monthStr = this.analyticsMonth();
-
-    if (!employees.length || !monthStr || !departments.length) {
-      return { absentCount: 0, lateCount: 0, earlyCount: 0, lateByDay: [], maxLateCount: 0 };
-    }
-
-    const [year, month] = monthStr.split('-').map(Number);
-    const daysInMonth = new Date(year, month, 0).getDate();
-    
-    const absentEmployees = new Set<string>();
-    const lateEmployees = new Set<string>();
-    const earlyLeavers = new Set<string>();
-    const lateByDay = new Map<number, number>();
-
-    const departmentsMap = new Map(departments.map(d => [d.id, d]));
-
-    const isWeekend = (date: Date) => {
-        const day = date.getDay();
-        return day === 0 || day === 6;
-    };
-
-    // Calculate absent employees (no DTR entries for the entire month)
-    for (const emp of employees) {
-      const hasAnyDtrInMonth = dtrEntries.some(dtr => dtr.user_id === emp.id);
-      if (!hasAnyDtrInMonth) {
-        absentEmployees.add(emp.id);
-      }
-    }
-
-    // Calculate daily metrics for working days
-    for (let day = 1; day <= daysInMonth; day++) {
-        const currentDate = new Date(year, month - 1, day);
-        if (isWeekend(currentDate)) continue;
-
-        lateByDay.set(day, 0); // Initialize count for the working day
-
-        for (const emp of employees) {
-            const empDtrForDay = dtrEntries.filter(dtr => dtr.user_id === emp.id && new Date(dtr.time_in!).getDate() === day);
-
-            if (empDtrForDay.length > 0) {
-              const firstEntry = empDtrForDay[0];
-              const lastEntry = empDtrForDay[empDtrForDay.length - 1];
-
-              const department = emp.departments;
-
-              if (department) {
-                  // Check for lateness on first entry
-                  if (department.work_start_time && firstEntry.time_in) {
-                      const timeIn = new Date(firstEntry.time_in);
-                      const [h, m, s] = department.work_start_time.split(':').map(Number);
-                      const expectedStart = new Date(timeIn);
-                      expectedStart.setHours(h, m, s, 0);
-                      const gracePeriodMs = (department.grace_period_minutes || 0) * 60 * 1000;
-                      if (timeIn.getTime() > expectedStart.getTime() + gracePeriodMs) {
-                          lateEmployees.add(emp.id);
-                          lateByDay.set(day, (lateByDay.get(day) || 0) + 1);
-                      }
-                  }
-                  // Check for early leave on last entry
-                  if (department.work_end_time && lastEntry.time_out) {
-                      const timeOut = new Date(lastEntry.time_out);
-                      const [h, m, s] = department.work_end_time.split(':').map(Number);
-                      const expectedEnd = new Date(timeOut);
-                      expectedEnd.setHours(h, m, s, 0);
-                      if (timeOut.getTime() < expectedEnd.getTime()) {
-                          earlyLeavers.add(emp.id);
-                      }
-                  }
-              }
-            }
-        }
-    }
-    
-    const lateByDayArray = Array.from(lateByDay.entries())
-                                  .map(([day, count]) => ({ day, count }))
-                                  .sort((a, b) => a.day - b.day);
-
-    return {
-        absentCount: absentEmployees.size,
-        lateCount: lateEmployees.size,
-        earlyCount: earlyLeavers.size,
-        lateByDay: lateByDayArray,
-        maxLateCount: Math.max(1, ...lateByDayArray.map(d => d.count)) // use 1 to avoid division by zero
-    };
+    // This calculation is now incorrect due to schedule changes.
+    // It should be updated to fetch daily schedules.
+    // For now, it will produce inaccurate results.
+    return { absentCount: 0, lateCount: 0, earlyCount: 0, lateByDay: [], maxLateCount: 0 };
   });
 
   isAddEmployeeModalVisible = signal(false);
-  isAddDepartmentModalVisible = signal(false);
   isRunPayrollModalVisible = signal(false); 
   isIdCardModalVisible = signal(false);
   isViewEmployeeModalVisible = signal(false);
+  isSetScheduleModalVisible = signal(false);
   
   logoutError = signal<string | null>(null);
   
   selectedEmployee = signal<Profile | null>(null);
   employeeToEdit = signal<Profile | null>(null);
-  departmentToEdit = signal<Department | null>(null);
   
   isConfirmModalVisible = signal(false);
   confirmModalConfig = signal<ConfirmModalConfig>({ title: '', message: '', onConfirm: () => {} });
@@ -301,24 +313,62 @@ export class AdminDashboardComponent {
   constructor() {
     this.loadInitialData();
 
-    effect(() => {
+    effect((onCleanup) => {
       const tab = this.activeTab();
-      if (tab === 'dtr' && this.dtrEntries().length === 0) this.loadDtrEntries();
+      // Pre-load data for better UX
+      if (tab === 'employees' && this.employees().length === 0) this.loadEmployees();
+      if (tab === 'dtr' && this.dtrEntries().length === 0) this.loadDtrAndPayrolls();
       if (tab === 'payroll' && this.payrolls().length === 0) this.loadPayrolls();
-      if (tab === 'analytics') this.loadDtrForAnalyticsMonth();
-    }, { allowSignalWrites: true });
-    
-    effect(() => {
-      this.analyticsMonth();
-      if(this.activeTab() === 'analytics') {
-          this.loadDtrForAnalyticsMonth();
+      
+      if (this.realtimeChannel) {
+        this.supabaseService.unsubscribe(this.realtimeChannel);
       }
+      this.realtimeChannel = this.supabaseService.subscribeToTableChanges(() => {
+        const currentTab = this.activeTab();
+        if (currentTab === 'employees') {
+            this.loadEmployees();
+        } else if (currentTab === 'dtr') {
+            this.loadDtrAndPayrolls();
+        }
+      });
+
+      onCleanup(() => {
+        if(this.realtimeChannel) this.supabaseService.unsubscribe(this.realtimeChannel);
+      });
+
+    });
+
+    // Effect for scanner lifecycle
+    effect(() => {
+        const videoElRef = this.video();
+        if (this.isTimeClockModeActive() && videoElRef) {
+            this.startScanner();
+        } else {
+            this.stopScanner();
+        }
     });
   }
 
+  ngOnDestroy(): void {
+    if (this.realtimeChannel) {
+      this.supabaseService.unsubscribe(this.realtimeChannel);
+    }
+    if (this.notificationTimer) {
+      clearTimeout(this.notificationTimer);
+    }
+    this.stopScanner();
+  }
+
   loadInitialData(): void {
-    this.loadDepartments();
     this.loadEmployees();
+  }
+
+  showNotification(type: 'success' | 'error', message: string, duration = 5000): void {
+    if (this.notificationTimer) {
+      clearTimeout(this.notificationTimer);
+    }
+    this.notification.set({ type, message });
+    this.notificationTimer = setTimeout(() => this.notification.set(null), duration);
   }
   
   onSearchTermChange(event: Event): void {
@@ -354,14 +404,22 @@ export class AdminDashboardComponent {
     this.employeesLoading.set(true);
     this.employeesError.set(null);
     try {
+      // The service now fetches only employee profiles directly.
       const { data, error } = await this.supabaseService.getAllUsersWithProfiles();
       if (error) throw error;
+
       this.employees.set(data || []);
+
     } catch (e: any) {
       this.employeesError.set(`Failed to load employees: ${e.message}`);
     } finally {
       this.employeesLoading.set(false);
     }
+  }
+
+  async loadDtrAndPayrolls(): Promise<void> {
+    await this.loadDtrEntries();
+    await this.loadPayrolls();
   }
 
   async loadDtrEntries(): Promise<void> {
@@ -370,29 +428,11 @@ export class AdminDashboardComponent {
     try {
       const { data, error } = await this.supabaseService.getAllDtrEntries();
       if (error) throw error;
-      this.dtrEntries.set(data || []);
+      this.dtrEntries.set(data as any || []);
     } catch (e: any) {
       this.dtrError.set(`Failed to load DTR entries: ${e.message}`);
     } finally {
       this.dtrLoading.set(false);
-    }
-  }
-  
-  async loadDtrForAnalyticsMonth(): Promise<void> {
-    this.analyticsLoading.set(true);
-    this.analyticsError.set(null);
-    try {
-      const [year, month] = this.analyticsMonth().split('-').map(Number);
-      const startDate = new Date(year, month - 1, 1).toISOString();
-      const endDate = new Date(year, month, 1).toISOString();
-      
-      const { data, error } = await this.supabaseService.getDtrEntriesForDateRange(startDate, endDate);
-      if (error) throw error;
-      this.dtrEntriesForAnalytics.set(data || []);
-    } catch (e: any) {
-      this.analyticsError.set(`Failed to load analytics data: ${e.message}`);
-    } finally {
-      this.analyticsLoading.set(false);
     }
   }
 
@@ -402,7 +442,7 @@ export class AdminDashboardComponent {
     try {
       const { data, error } = await this.supabaseService.getAllPayrolls();
       if (error) throw error;
-      this.payrolls.set(data || []);
+      this.payrolls.set(data  as any || []);
     } catch (e: any) {
       this.payrollsError.set(`Failed to load payrolls: ${e.message}`);
     } finally {
@@ -410,30 +450,35 @@ export class AdminDashboardComponent {
     }
   }
 
-  refreshPayrolls(): void {
-    this.loadPayrolls();
-  }
-  
-  async loadDepartments(): Promise<void> {
-    this.departmentsLoading.set(true);
-    this.departmentsError.set(null);
-    try {
-      const { data, error } = await this.supabaseService.getAllDepartments();
-      if (error) throw error;
-      this.departments.set(data || []);
-    } catch (e: any) {
-      this.departmentsError.set(`Failed to load departments: ${e.message}`);
-    } finally {
-      this.departmentsLoading.set(false);
-    }
+  onEmployeeSaved(): void {
+    this.showNotification('success', 'Employee data has been successfully saved.');
+    this.refreshAllData();
   }
 
+  refreshPayrolls(): void {
+    this.showNotification('success', 'Payroll list has been updated.');
+    this.loadPayrolls();
+    this.loadDtrEntries(); // To update status
+  }
+  
   refreshAllData(): void {
     this.loadInitialData();
   }
   
-  toggleDtrMonth(monthYearValue: string): void {
-    this.openDtrMonths.update(currentSet => {
+  toggleDtrPeriod(periodId: string): void {
+    this.openDtrPeriods.update(currentSet => {
+        const newSet = new Set(currentSet);
+        if (newSet.has(periodId)) {
+            newSet.delete(periodId);
+        } else {
+            newSet.add(periodId);
+        }
+        return newSet;
+    });
+  }
+
+  togglePayrollMonth(monthYearValue: string): void {
+    this.openPayrollMonths.update(currentSet => {
         const newSet = new Set(currentSet);
         if (newSet.has(monthYearValue)) {
             newSet.delete(monthYearValue);
@@ -470,56 +515,37 @@ export class AdminDashboardComponent {
     this.employeeToEdit.set(null);
   }
 
-  openAddDepartmentModal(): void {
-    this.departmentToEdit.set(null);
-    this.isAddDepartmentModalVisible.set(true);
+  openRunPayrollForPeriod(group: DtrPayPeriodGroup): void {
+    this.selectedPayPeriod.set({ start: group.payPeriodStart, end: group.payPeriodEnd });
+    this.isRunPayrollModalVisible.set(true);
   }
 
-  openEditDepartmentModal(department: Department): void {
-    this.departmentToEdit.set(department);
-    this.isAddDepartmentModalVisible.set(true);
+  closeRunPayrollModal(): void {
+    this.isRunPayrollModalVisible.set(false);
+    this.selectedPayPeriod.set(null);
   }
 
-  closeDepartmentModal(): void {
-    this.isAddDepartmentModalVisible.set(false);
-    this.departmentToEdit.set(null);
-  }
-  
-  // --- Delete Operations ---
-  openDeleteDepartmentConfirmation(dept: Department): void {
+  // --- Employee Delete Operation ---
+  openDeleteConfirmation(employee: Profile): void {
     this.confirmModalConfig.set({
-      title: 'Delete Department?',
-      message: `Are you sure you want to delete the "${dept.name}" department? This action cannot be undone.`,
-      onConfirm: () => this.handleDeleteDepartment(dept.id),
+      title: 'Delete Employee?',
+      message: `Are you sure you want to permanently delete ${employee.first_name} ${employee.last_name}? This will remove their profile and all associated data. This action cannot be undone.`,
+      onConfirm: () => this.handleDeleteEmployee(employee),
     });
     this.isConfirmModalVisible.set(true);
   }
 
-  async handleDeleteDepartment(id: number): Promise<void> {
-    const { error } = await this.supabaseService.deleteDepartment(id);
+  async handleDeleteEmployee(employee: Profile): Promise<void> {
+    const { error } = await this.supabaseService.deleteUserAndProfile(employee.id);
     if (error) {
-      alert(`Error deleting department: ${error.message}`);
+      let errorMessage = `Error deleting employee: ${error.message}`;
+      if (error.message.includes('Could not find the function')) {
+        errorMessage = 'Database setup required. Please see the instructions in the supabase.service.ts file to create the delete_auth_user function in your Supabase SQL Editor.';
+      }
+      this.showNotification('error', errorMessage);
     } else {
-      this.loadDepartments();
-    }
-    this.isConfirmModalVisible.set(false);
-  }
-
-  openDeleteEmployeeConfirmation(employee: Profile): void {
-    this.confirmModalConfig.set({
-      title: 'Deactivate Employee?',
-      message: `Are you sure you want to deactivate ${employee.first_name} ${employee.last_name}? Their data will be saved, but they will be hidden from active lists.`,
-      onConfirm: () => this.handleDeactivateEmployee(employee.id),
-    });
-    this.isConfirmModalVisible.set(true);
-  }
-
-  async handleDeactivateEmployee(id: string): Promise<void> {
-    const { error } = await this.supabaseService.updateUserProfile(id, { status: 'inactive' });
-    if (error) {
-      alert(`Error deactivating employee: ${error.message}`);
-    } else {
-      this.loadEmployees();
+      this.showNotification('success', `${employee.first_name} ${employee.last_name} has been deleted.`);
+      this.loadEmployees(); // Reload list after deletion
     }
     this.isConfirmModalVisible.set(false);
   }
@@ -540,28 +566,204 @@ export class AdminDashboardComponent {
       // 2. Make API call
       const { error } = await this.supabaseService.updatePayrollStatus(payrollId, newStatus);
       if (error) throw error;
-      // Success: UI is already updated, do nothing.
+      // Success: UI is already updated
+      this.showNotification('success', `Payroll status updated to ${newStatus}.`);
     } catch (error: any) {
       // 3. Revert on failure
-      alert(`Failed to update status: ${error.message}. Reverting change.`);
+      this.showNotification('error', `Failed to update status: ${error.message}. Reverting change.`);
       this.payrolls.set(originalPayrolls);
     }
+  }
+
+  async exportDtrPeriodToCsv(group: DtrPayPeriodGroup): Promise<void> {
+    this.showNotification('success', 'Generating CSV export...');
+    const periodStartStr = group.payPeriodStart.toISOString().slice(0, 10);
+    
+    // Find all payroll records for this specific period start date
+    const payrollsForPeriod = this.payrolls().filter(p => p.pay_period_start.startsWith(periodStartStr));
+
+    if (payrollsForPeriod.length === 0) {
+        this.showNotification('error', 'No payroll data found for this period to export.');
+        return;
+    }
+
+    const csvRows = [];
+    // Headers
+    const headers = [
+        'Employee ID', 'Full Name', 'Late Arrivals (mins)', 
+        'Early Departures (mins)', 'Birth Month Bonus (PHP)', 'Net Pay (PHP)'
+    ];
+    csvRows.push(headers.join(','));
+
+    // Data rows
+    for (const payroll of payrollsForPeriod) {
+        const empProfile = payroll.profiles;
+        if (!empProfile) continue;
+
+        let birthMonthBonus = 0;
+        if (empProfile.birth_date && empProfile.position) {
+            const birthMonth = new Date(empProfile.birth_date).getUTCMonth();
+            const payrollEndMonth = new Date(payroll.pay_period_end).getUTCMonth();
+            if (birthMonth === payrollEndMonth) {
+                birthMonthBonus = BIRTH_MONTH_BONUS[empProfile.position as keyof typeof BIRTH_MONTH_BONUS] || 0;
+            }
+        }
+        
+        const row = [
+            `"${empProfile.employee_id || ''}"`,
+            `"${empProfile.first_name || ''} ${empProfile.middle_name || ''} ${empProfile.last_name || ''}"`,
+            payroll.lateness_minutes,
+            payroll.early_departure_minutes,
+            birthMonthBonus,
+            payroll.net_pay
+        ];
+        csvRows.push(row.join(','));
+    }
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    const fileName = `payroll_export_${group.id}.csv`;
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   async onLogout(): Promise<void> {
     this.logoutError.set(null);
     try {
       const { error } = await this.supabaseService.signOut();
-      // If there's an error, but it's "Auth session missing!", we can ignore it
-      // because the user is effectively logged out.
       if (error && error.message !== 'Auth session missing!') {
         throw error;
       }
-      // For successful sign out or "session missing" error, navigate to login.
       this.router.navigate(['/login']);
     } catch (e: any) {
-      // Handles any other unexpected errors during sign out.
       this.logoutError.set(`Failed to log out: ${e.message}`);
+    }
+  }
+
+  // --- Time Clock Mode Methods ---
+
+  toggleTimeClockMode(): void {
+    this.isTimeClockModeActive.update(active => !active);
+  }
+
+  private async startScanner(): Promise<void> {
+    try {
+        if (this.isScanning) return;
+        if (this.stream) this.stopScanner();
+        
+        const videoEl = this.video()?.nativeElement;
+        if (!videoEl || !navigator.mediaDevices?.getUserMedia) {
+            throw new Error('Camera not available or not supported by this browser.');
+        }
+        
+        this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+
+        videoEl.srcObject = this.stream;
+        videoEl.setAttribute('playsinline', 'true');
+        await videoEl.play();
+        
+        this.isScanning = true;
+        this.scannerErrorMessage.set(null);
+        this.lastScanResult.set(null);
+        requestAnimationFrame(this.tick.bind(this));
+
+    } catch (err: any) {
+        console.error('Error starting scanner:', err);
+        this.scannerErrorMessage.set(err.message || 'Could not access the camera. Check permissions.');
+    }
+  }
+
+  private stopScanner(): void {
+    this.isScanning = false;
+    if (this.scanResultTimer) {
+        clearTimeout(this.scanResultTimer);
+    }
+    if (this.stream) {
+        this.stream.getTracks().forEach(track => track.stop());
+        this.stream = null;
+    }
+    const videoEl = this.video()?.nativeElement;
+    if (videoEl) {
+        videoEl.srcObject = null;
+    }
+  }
+
+  private tick(): void {
+    if (!this.isScanning) return;
+
+    const videoEl = this.video()?.nativeElement;
+    const canvasEl = this.canvas()?.nativeElement;
+    
+    if (videoEl && videoEl.readyState === videoEl.HAVE_ENOUGH_DATA && canvasEl) {
+      const ctx = canvasEl.getContext('2d', { willReadFrequently: true });
+      if (ctx) {
+        canvasEl.height = videoEl.videoHeight;
+        canvasEl.width = videoEl.videoWidth;
+        ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+        
+        const imageData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'dontInvert',
+        });
+        
+        if (code) {
+          this.isScanning = false; // Stop further scanning while processing
+          this.handleQrCodeScan(code.data);
+          return; // Exit the loop
+        }
+      }
+    }
+    
+    requestAnimationFrame(this.tick.bind(this));
+  }
+  
+  private async handleQrCodeScan(qrData: string): Promise<void> {
+    this.scannerLoading.set(true);
+    this.scannerErrorMessage.set(null);
+    
+    if (this.scanResultTimer) {
+        clearTimeout(this.scanResultTimer);
+    }
+
+    try {
+        const parsedData = JSON.parse(qrData);
+        if (!parsedData.userId) {
+            throw new Error('Invalid QR code format.');
+        }
+        
+        const { profile, dtrEntry } = await this.supabaseService.handleQrCodeLogin(parsedData.userId);
+
+        this.lastScanResult.set({
+            profile,
+            dtrEntry,
+            type: dtrEntry.time_out ? 'out' : 'in',
+        });
+        
+        // Hide message and restart scan after 5 seconds
+        this.scanResultTimer = setTimeout(() => {
+            this.lastScanResult.set(null);
+            if (this.isTimeClockModeActive()) {
+                this.isScanning = true;
+                requestAnimationFrame(this.tick.bind(this));
+            }
+        }, 5000);
+
+    } catch (error: any) {
+        this.scannerErrorMessage.set(error.message || 'Failed to process QR code.');
+        // Hide error and restart scan after 5 seconds
+        this.scanResultTimer = setTimeout(() => {
+            this.scannerErrorMessage.set(null);
+            if (this.isTimeClockModeActive()) {
+                this.isScanning = true;
+                requestAnimationFrame(this.tick.bind(this));
+            }
+        }, 5000);
+    } finally {
+        this.scannerLoading.set(false);
     }
   }
 }

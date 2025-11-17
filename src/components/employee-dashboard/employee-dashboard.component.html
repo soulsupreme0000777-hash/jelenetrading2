@@ -1,6 +1,14 @@
-<div class="flex h-screen bg-gray-100 dark:bg-gray-900">
+<div class="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans">
+  <!-- Mobile Sidebar Backdrop -->
+  @if(isSidebarOpen()) {
+    <div (click)="isSidebarOpen.set(false)" class="fixed inset-0 bg-black/60 z-10 sm:hidden"></div>
+  }
+
   <!-- Sidebar -->
-  <aside class="w-64 flex-shrink-0 bg-gray-800 dark:bg-gray-900 text-white flex flex-col">
+  <aside 
+    class="w-64 flex-shrink-0 bg-gray-800 dark:bg-gray-900 text-white flex flex-col fixed inset-y-0 left-0 z-20 transform transition-transform duration-300 ease-in-out sm:relative sm:translate-x-0"
+    [class.-translate-x-full]="!isSidebarOpen()"
+    [class.translate-x-0]="isSidebarOpen()">
     <div class="h-16 flex items-center justify-center px-4 bg-gray-900 dark:bg-black/20">
       <h2 class="text-2xl font-bold text-white tracking-wider">Employee</h2>
     </div>
@@ -12,6 +20,22 @@
         class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
         <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
         <span class="font-medium">My Profile</span>
+      </button>
+       <button 
+        (click)="setActiveTab('leave_status')"
+        [class.bg-indigo-600]="activeTab() === 'leave_status'"
+        [class.hover:bg-gray-700]="activeTab() !== 'leave_status'"
+        class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
+        <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+        <span class="font-medium">Leave & Status</span>
+      </button>
+      <button 
+        (click)="setActiveTab('schedule')"
+        [class.bg-indigo-600]="activeTab() === 'schedule'"
+        [class.hover:bg-gray-700]="activeTab() !== 'schedule'"
+        class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
+        <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0h18M12 12.75h.008v.008H12v-.008Z" /></svg>
+        <span class="font-medium">My Schedule</span>
       </button>
       <button 
         (click)="setActiveTab('dtr')"
@@ -28,14 +52,6 @@
         class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
         <span class="font-medium">Payroll History</span>
-      </button>
-      <button 
-        (click)="setActiveTab('analytics')"
-        [class.bg-indigo-600]="activeTab() === 'analytics'"
-        [class.hover:bg-gray-700]="activeTab() !== 'analytics'"
-        class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
-        <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 100 15 7.5 7.5 0 000-15z" /><path stroke-linecap="round" stroke-linejoin="round" d="M12.75 9.75v3.75m0 0H15m-2.25 0H9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-        <span class="font-medium">My Analytics</span>
       </button>
     </nav>
     <div class="p-4 border-t border-gray-700">
@@ -54,14 +70,24 @@
   <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Header -->
     <header class="bg-white dark:bg-gray-800 shadow-md">
-      <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-        @switch (activeTab()) {
-          @case ('profile') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1> }
-          @case ('dtr') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Time Logs</h1> }
-          @case ('payroll') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Payroll History</h1> }
-          @case ('analytics') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Analytics</h1> }
-        }
-        <span class="text-sm hidden sm:inline text-gray-700 dark:text-gray-300">Welcome, {{ userEmail() }}</span>
+      <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex items-center">
+        <!-- Hamburger button for mobile -->
+        <button (click)="isSidebarOpen.set(true)" class="sm:hidden p-2 -ml-2 mr-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none">
+          <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+        
+        <div class="flex-1 flex justify-between items-center">
+          @switch (activeTab()) {
+            @case ('profile') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1> }
+            @case ('schedule') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Schedule</h1> }
+            @case ('dtr') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Time Logs</h1> }
+            @case ('payroll') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Payroll History</h1> }
+            @case ('leave_status') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Leave & Status</h1> }
+          }
+          <span class="text-sm hidden sm:inline text-gray-700 dark:text-gray-300">Welcome, {{ userEmail() }}</span>
+        </div>
       </div>
     </header>
 
@@ -75,18 +101,9 @@
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
                   <div class="p-8">
                     <!-- Profile Header -->
-                    <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-                      @if(profile.avatar_url) {
-                        <img [src]="profile.avatar_url" alt="Avatar" class="h-32 w-32 rounded-full object-cover border-4 border-gray-200 dark:border-gray-700 flex-shrink-0">
-                      } @else {
-                        <div class="h-32 w-32 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center border-4 border-gray-200 dark:border-gray-700 flex-shrink-0">
-                          <svg class="w-16 h-16 text-gray-400 dark:text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>
-                        </div>
-                      }
-                      <div class="text-center sm:text-left">
-                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ profile.first_name }} {{ profile.middle_name }} {{ profile.last_name }}</h2>
-                        <p class="text-md text-indigo-600 dark:text-indigo-400 font-semibold">{{ profile.position }}</p>
-                      </div>
+                    <div class="text-center sm:text-left">
+                      <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ profile.first_name }} {{ profile.middle_name }} {{ profile.last_name }}</h2>
+                      <p class="text-md text-indigo-600 dark:text-indigo-400 font-semibold capitalize">{{ profile.position }} @if(profile.branch) { <span class="text-gray-500 dark:text-gray-400 font-normal">- {{ profile.branch }}</span> }</p>
                     </div>
 
                     <!-- HR Notice -->
@@ -115,20 +132,24 @@
                           <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ profile.mobile_number }}</dd>
                         </div>
                         <div>
+                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Hire Date</dt>
+                          <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ profile.hire_date | date:'longDate' }}</dd>
+                        </div>
+                        <div>
                           <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Age</dt>
                           <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ profile.age }}</dd>
                         </div>
                         <div>
-                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Department</dt>
-                          <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ profile.departments?.name }}</dd>
+                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Branch</dt>
+                          <dd class="mt-1 text-sm text-gray-900 dark:text-white capitalize">{{ profile.branch }}</dd>
+                        </div>
+                        <div>
+                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Position</dt>
+                          <dd class="mt-1 text-sm text-gray-900 dark:text-white capitalize">{{ profile.position }}</dd>
                         </div>
                         <div>
                           <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Daily Rate</dt>
                           <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ profile.daily_rate | currency:'PHP':'symbol':'1.2-2' }}</dd>
-                        </div>
-                        <div>
-                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
-                          <dd class="mt-1 text-sm text-gray-900 dark:text-white capitalize">{{ profile.status }}</dd>
                         </div>
                       </dl>
                     </div>
@@ -139,6 +160,133 @@
               <div class="text-center p-8 text-gray-500 dark:text-gray-400">Loading profile...</div>
             }
           }
+           @case('leave_status') {
+            <div class="px-4 py-6 sm:px-0 space-y-8">
+              <!-- Leave Balances -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
+                  <div class="bg-blue-100 dark:bg-blue-900/50 p-3 rounded-full"><svg class="w-8 h-8 text-blue-600 dark:text-blue-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg></div>
+                  <div><p class="text-sm text-gray-500 dark:text-gray-400">Day Offs Remaining</p><p class="text-3xl font-bold text-gray-900 dark:text-white">{{ dayOffBalance() }}</p></div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
+                  <div class="bg-purple-100 dark:bg-purple-900/50 p-3 rounded-full"><svg class="w-8 h-8 text-purple-600 dark:text-purple-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.5 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg></div>
+                  <div><p class="text-sm text-gray-500 dark:text-gray-400">Service Incentive Leave</p><p class="text-3xl font-bold text-gray-900 dark:text-white">{{ silBalance() }}</p></div>
+                </div>
+              </div>
+
+               <!-- Request Leave -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Request Leave for Today</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Select the type of leave you wish to take. This will be logged immediately.</p>
+                </div>
+                 @if(leaveError()) {
+                  <div class="m-6 bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
+                    <p>{{ leaveError() }}</p>
+                  </div>
+                 }
+                <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <button (click)="requestLeave('day_off')" [disabled]="dayOffBalance() <= 0" class="p-4 bg-blue-500 text-white rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 dark:disabled:bg-blue-800 disabled:cursor-not-allowed transition-colors">Day Off</button>
+                  <button (click)="requestLeave('service_incentive_leave')" [disabled]="!isEligibleForSIL() || silBalance() <= 0" class="p-4 bg-purple-500 text-white rounded-lg shadow-md hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-purple-300 dark:disabled:bg-purple-800 disabled:cursor-not-allowed transition-colors">Service Incentive Leave</button>
+                  <button (click)="requestLeave('emergency_leave')" [disabled]="dayOffBalance() <= 0" class="p-4 bg-orange-500 text-white rounded-lg shadow-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:bg-orange-300 dark:disabled:bg-orange-800 disabled:cursor-not-allowed transition-colors">Emergency Leave</button>
+                </div>
+              </div>
+
+               <!-- Leave History -->
+              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Leave History</h3>
+                </div>
+                <div class="p-6">
+                  @if(leaveLoading()) {
+                    <p class="text-center text-gray-500 dark:text-gray-400">Loading leave history...</p>
+                  } @else if (leaveHistory().length === 0) {
+                    <p class="text-center text-gray-500 dark:text-gray-400">You have no leave history yet.</p>
+                  } @else {
+                    <div class="overflow-x-auto">
+                      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                          <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Leave Type</th>
+                          </tr>
+                        </thead>
+                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                          @for(entry of leaveHistory(); track entry.id) {
+                            <tr>
+                              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ entry.date | date:'longDate' }}</td>
+                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 capitalize">{{ entry.status.replace('_', ' ') }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+           @case ('schedule') {
+            <div class="px-4 py-6 sm:px-0">
+              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                  <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{ currentDate() | date:'MMMM yyyy' }}</h3>
+                  <div class="flex items-center space-x-2">
+                    <button (click)="previousMonth()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                    </button>
+                    <button (click)="nextMonth()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+                    </button>
+                  </div>
+                </div>
+                 @if(scheduleLoading()) {
+                  <p class="text-center p-8 text-gray-500 dark:text-gray-400">Loading your schedule...</p>
+                 } @else if(scheduleError()) {
+                  <p class="text-center p-8 text-red-500 dark:text-red-400">{{ scheduleError() }}</p>
+                 } @else {
+                  <div class="p-2">
+                    <div class="grid grid-cols-7 gap-px">
+                      @for(day of ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; track day) {
+                        <div class="text-center text-xs font-semibold text-gray-500 dark:text-gray-400 py-2">{{day}}</div>
+                      }
+                      @for(day of calendarDays(); track day.date) {
+                        <div class="relative min-h-[100px] p-2 border-t border-l border-gray-200 dark:border-gray-700"
+                            [class.bg-white]="day.isCurrentMonth"
+                            [class.dark:bg-gray-800]="day.isCurrentMonth"
+                            [class.bg-gray-50]="!day.isCurrentMonth"
+                            [class.dark:bg-gray-800/50]="!day.isCurrentMonth"
+                            [class.text-gray-400]="!day.isCurrentMonth"
+                            [class.dark:text-gray-500]="!day.isCurrentMonth">
+                          <time [attr.datetime]="day.date | date:'yyyy-MM-dd'" 
+                                class="font-semibold"
+                                [class.text-white]="day.isToday"
+                                [class.bg-indigo-600]="day.isToday"
+                                [class.rounded-full]="day.isToday"
+                                [class.w-6]="day.isToday"
+                                [class.h-6]="day.isToday"
+                                [class.flex]="day.isToday"
+                                [class.items-center]="day.isToday"
+                                [class.justify-center]="day.isToday">
+                            {{ day.dayOfMonth }}
+                          </time>
+                          @if(day.schedule) {
+                            <div class="mt-1 p-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-md text-xs text-center">
+                              {{day.schedule}}
+                            </div>
+                          } @else if(day.isCurrentMonth) {
+                             <div class="mt-1 p-1 bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 rounded-md text-xs text-center">
+                              Rest Day
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+           }
           @case ('dtr') {
             <div class="px-4 py-6 sm:px-0 space-y-8">
               @if (dtrError()) {
@@ -270,45 +418,6 @@
                   }
                 </div>
               </div>
-            </div>
-          }
-          @case ('analytics') {
-            <div class="px-4 py-6 sm:px-0">
-              @if(analyticsLoading()) {
-                <div class="text-center p-8 text-gray-500 dark:text-gray-400">Calculating your analytics...</div>
-              } @else if (analyticsReport(); as report) {
-                <div class="space-y-8">
-                  <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-200">
-                    Attendance & Salary Report for {{ report.monthName }}
-                  </h3>
-                  <!-- Stat Cards Grid -->
-                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
-                      <div class="bg-green-100 dark:bg-green-900/50 p-3 rounded-full"><svg class="w-6 h-6 text-green-600 dark:text-green-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
-                      <div><p class="text-sm text-gray-500 dark:text-gray-400">On-Time Arrivals</p><p class="text-2xl font-bold text-gray-900 dark:text-white">{{ report.onTimeCount }}</p></div>
-                    </div>
-                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
-                      <div class="bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-full"><svg class="w-6 h-6 text-yellow-600 dark:text-yellow-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg></div>
-                      <div><p class="text-sm text-gray-500 dark:text-gray-400">Late Arrivals</p><p class="text-2xl font-bold text-gray-900 dark:text-white">{{ report.lateCount }}</p></div>
-                    </div>
-                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
-                      <div class="bg-orange-100 dark:bg-orange-900/50 p-3 rounded-full"><svg class="w-6 h-6 text-orange-600 dark:text-orange-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9.75v3.75m-3.75 0H15M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
-                      <div><p class="text-sm text-gray-500 dark:text-gray-400">Early Departures</p><p class="text-2xl font-bold text-gray-900 dark:text-white">{{ report.earlyLeaveCount }}</p></div>
-                    </div>
-                  </div>
-                  <!-- Salary Card -->
-                  <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-                    <h4 class="font-semibold text-gray-700 dark:text-gray-300">Estimated Salary This Month</h4>
-                    <p class="text-4xl font-bold text-indigo-600 dark:text-indigo-400 mt-2">{{ report.totalMonthlySalary | currency:'PHP':'symbol':'1.2-2' }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">This is an estimate based on days worked and your daily rate. It does not include overtime or other payroll adjustments.</p>
-                  </div>
-                </div>
-              } @else {
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center text-gray-500 dark:text-gray-400">
-                  <p class="font-semibold">Could not load analytics data.</p>
-                  <p class="text-sm mt-2">Please ensure your profile has a daily rate and department assigned. Contact HR for assistance.</p>
-                </div>
-              }
             </div>
           }
         }

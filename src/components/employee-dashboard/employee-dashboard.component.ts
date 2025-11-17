@@ -1,24 +1,24 @@
 import { Component, ChangeDetectionStrategy, inject, computed, signal, effect } from '@angular/core';
 import { Router } from '@angular/router';
-import { SupabaseService, DtrEntry, Payroll, Profile } from '../../services/supabase.service';
+import { SupabaseService, DtrEntry, Payroll, Profile, EmployeeSchedule, EmployeeStatus } from '../../services/supabase.service';
 import { FormsModule } from '@angular/forms';
-import { DatePipe, CurrencyPipe } from '@angular/common';
+import { DatePipe, CurrencyPipe, CommonModule } from '@angular/common';
 
-type EmployeeTab = 'profile' | 'dtr' | 'payroll' | 'analytics';
+type EmployeeTab = 'profile' | 'dtr' | 'payroll' | 'schedule' | 'leave_status';
 
-interface AnalyticsReport {
-  onTimeCount: number;
-  lateCount: number;
-  earlyLeaveCount: number;
-  totalMonthlySalary: number;
-  monthName: string;
+interface CalendarDay {
+  date: Date;
+  dayOfMonth: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  schedule?: string;
 }
 
 @Component({
   selector: 'app-employee-dashboard',
   templateUrl: './employee-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DatePipe, CurrencyPipe]
+  imports: [FormsModule, DatePipe, CurrencyPipe, CommonModule]
 })
 export class EmployeeDashboardComponent {
   private readonly supabaseService = inject(SupabaseService);
@@ -28,6 +28,7 @@ export class EmployeeDashboardComponent {
   userEmail = computed(() => this.userProfile()?.email || 'Employee');
   
   activeTab = signal<EmployeeTab>('profile');
+  isSidebarOpen = signal(false);
 
   // Signals for DTR
   dtrHistory = signal<DtrEntry[]>([]);
@@ -41,10 +42,29 @@ export class EmployeeDashboardComponent {
   logoutError = signal<string | null>(null);
   expandedPayrollId = signal<number | null>(null);
   
-  // Signals for Analytics
-  analyticsReport = signal<AnalyticsReport | null>(null);
-  analyticsLoading = signal(false);
+  // Signals for Schedule
+  scheduleLoading = signal(true);
+  scheduleError = signal<string|null>(null);
+  currentDate = signal(new Date());
+  calendarDays = signal<CalendarDay[]>([]);
 
+  // Signals for Leave & Status
+  leaveHistory = signal<EmployeeStatus[]>([]);
+  leaveLoading = signal(false);
+  leaveError = signal<string|null>(null);
+
+  dayOffBalance = computed(() => this.userProfile()?.day_off_balance ?? 0);
+  silBalance = computed(() => this.userProfile()?.sil_balance ?? 0);
+
+  isEligibleForSIL = computed(() => {
+    const profile = this.userProfile();
+    if (!profile || !profile.hire_date) return false;
+    const hireDate = new Date(profile.hire_date);
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    return hireDate <= oneYearAgo;
+  });
+  
   constructor() {
     this.loadDtrData();
 
@@ -53,14 +73,25 @@ export class EmployeeDashboardComponent {
       if (currentTab === 'payroll' && this.payrolls().length === 0) {
         this.loadPayrolls();
       }
-      if (currentTab === 'analytics' && !this.analyticsReport()) {
-        this.calculateAnalytics();
+      if (currentTab === 'schedule') {
+        this.generateCalendar();
+      }
+      if (currentTab === 'leave_status') {
+        this.loadLeaveHistory();
+      }
+    });
+
+    effect(() => {
+      this.currentDate(); // Re-render calendar when month changes
+      if (this.activeTab() === 'schedule') {
+         this.generateCalendar();
       }
     });
   }
   
   setActiveTab(tab: EmployeeTab): void {
     this.activeTab.set(tab);
+    this.isSidebarOpen.set(false);
   }
 
   async loadDtrData(): Promise<void> {
@@ -91,91 +122,141 @@ export class EmployeeDashboardComponent {
       this.payrollsLoading.set(false);
     }
   }
-  
-  calculateAnalytics(): void {
-    this.analyticsLoading.set(true);
 
+  async loadLeaveHistory(): Promise<void> {
+    this.leaveLoading.set(true);
+    this.leaveError.set(null);
+    try {
+      const { data, error } = await this.supabaseService.getStatusesForCurrentUser();
+      if (error) throw error;
+      this.leaveHistory.set(data as EmployeeStatus[]);
+    } catch(e: any) {
+      this.leaveError.set(`Failed to load leave history: ${e.message}`);
+    } finally {
+      this.leaveLoading.set(false);
+    }
+  }
+
+  async requestLeave(type: EmployeeStatus['status']) {
+    this.leaveError.set(null);
     const profile = this.userProfile();
-    const dtrHistory = this.dtrHistory();
-
-    if (!profile || !profile.departments || !profile.daily_rate) {
-        this.analyticsLoading.set(false);
-        // Set report to null to show an error message in the template
-        this.analyticsReport.set(null);
+    if (!profile) return;
+    
+    // Check for existing leave today
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if(this.leaveHistory().some(h => h.date === todayStr)) {
+        this.leaveError.set("You have already requested leave for today.");
         return;
     }
 
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+    let newBalances: Partial<Profile> = {};
 
-    const currentMonthDtr = dtrHistory.filter(entry => {
-        const entryDate = new Date(entry.time_in!);
-        return entryDate.getFullYear() === year && entryDate.getMonth() === month;
+    switch (type) {
+        case 'day_off':
+        case 'emergency_leave':
+            if (this.dayOffBalance() <= 0) {
+                this.leaveError.set('You have no day-offs remaining.');
+                return;
+            }
+            newBalances.day_off_balance = this.dayOffBalance() - 1;
+            break;
+        case 'service_incentive_leave':
+            if (!this.isEligibleForSIL()) {
+                this.leaveError.set('You are not yet eligible for Service Incentive Leave.');
+                return;
+            }
+            if (this.silBalance() <= 0) {
+                this.leaveError.set('You have no Service Incentive Leaves remaining.');
+                return;
+            }
+            newBalances.sil_balance = this.silBalance() - 1;
+            break;
+    }
+
+    try {
+        await this.supabaseService.setEmployeeStatus(profile.id, type, newBalances);
+        // Refresh profile to get updated balances
+        await this.supabaseService.loadUserProfile(profile.id);
+        // Refresh leave history
+        this.loadLeaveHistory();
+    } catch (e: any) {
+        this.leaveError.set(e.message || 'An error occurred while setting status.');
+    }
+  }
+  
+  async generateCalendar(): Promise<void> {
+    const user = this.userProfile();
+    if (!user) return;
+    
+    this.scheduleLoading.set(true);
+    this.scheduleError.set(null);
+
+    const date = this.currentDate();
+    const year = date.getFullYear();
+    const month = date.getMonth();
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    
+    const startDate = new Date(firstDayOfMonth);
+    startDate.setDate(startDate.getDate() - firstDayOfMonth.getDay());
+    
+    const endDate = new Date(lastDayOfMonth);
+    endDate.setDate(endDate.getDate() + (6 - lastDayOfMonth.getDay()));
+
+    // Fetch schedules for the visible date range
+    let schedules: EmployeeSchedule[] = [];
+    try {
+      const { data, error } = await this.supabaseService.getSchedulesForDateRange(
+        [user.id], 
+        startDate.toISOString().slice(0,10), 
+        endDate.toISOString().slice(0,10)
+      );
+      if (error) throw error;
+      schedules = data || [];
+    } catch(e: any) {
+      this.scheduleError.set('Could not load schedule data.');
+    }
+
+    const scheduleMap = new Map<string, string>();
+    schedules.forEach(s => {
+      const start = s.work_start_time.slice(0, 5);
+      const end = s.work_end_time.slice(0, 5);
+      scheduleMap.set(s.date, `${start} - ${end}`);
     });
 
-    let onTimeCount = 0;
-    let lateCount = 0;
-    let earlyLeaveCount = 0;
-
-    const dtrByDay: Record<string, DtrEntry[]> = {};
-    for (const dtr of currentMonthDtr) {
-        if (dtr.time_in) {
-            const day = dtr.time_in.substring(0, 10);
-            if (!dtrByDay[day]) {
-              dtrByDay[day] = [];
-            }
-            dtrByDay[day].push(dtr);
-        }
+    const days: CalendarDay[] = [];
+    let day = new Date(startDate);
+    while (day <= endDate) {
+      const dateStr = day.toISOString().slice(0,10);
+      days.push({
+        date: new Date(day),
+        dayOfMonth: day.getDate(),
+        isCurrentMonth: day.getMonth() === month,
+        isToday: dateStr === new Date().toISOString().slice(0,10),
+        schedule: scheduleMap.get(dateStr)
+      });
+      day.setDate(day.getDate() + 1);
     }
     
-    const department = profile.departments;
-    
-    Object.values(dtrByDay).forEach((dailyEntries: DtrEntry[]) => {
-        dailyEntries.sort((a, b) => new Date(a.time_in!).getTime() - new Date(b.time_in!).getTime());
-        const firstEntry = dailyEntries[0];
-        const lastEntry = dailyEntries[dailyEntries.length - 1];
+    this.calendarDays.set(days);
+    this.scheduleLoading.set(false);
+  }
 
-        // Lateness check
-        if (department.work_start_time && firstEntry.time_in) {
-            const timeIn = new Date(firstEntry.time_in);
-            const [h, m, s] = department.work_start_time.split(':').map(Number);
-            const expectedStart = new Date(timeIn);
-            expectedStart.setHours(h, m, s, 0);
-            const gracePeriodMs = (department.grace_period_minutes || 0) * 60 * 1000;
-            if (timeIn.getTime() > expectedStart.getTime() + gracePeriodMs) {
-                lateCount++;
-            } else {
-                onTimeCount++;
-            }
-        } else {
-          onTimeCount++; // If no start time is defined, count as on-time
-        }
-
-        // Early leave check
-        if (department.work_end_time && lastEntry.time_out) {
-            const timeOut = new Date(lastEntry.time_out);
-            const [h, m, s] = department.work_end_time.split(':').map(Number);
-            const expectedEnd = new Date(timeOut);
-            expectedEnd.setHours(h, m, s, 0);
-            if (timeOut.getTime() < expectedEnd.getTime()) {
-                earlyLeaveCount++;
-            }
-        }
+  previousMonth(): void {
+    this.currentDate.update(d => {
+      const newDate = new Date(d);
+      newDate.setMonth(newDate.getMonth() - 1);
+      return newDate;
     });
+  }
 
-    const daysWorked = Object.keys(dtrByDay).length;
-    const totalMonthlySalary = daysWorked * profile.daily_rate;
-
-    this.analyticsReport.set({
-        onTimeCount,
-        lateCount,
-        earlyLeaveCount,
-        totalMonthlySalary,
-        monthName
+  nextMonth(): void {
+    this.currentDate.update(d => {
+      const newDate = new Date(d);
+      newDate.setMonth(newDate.getMonth() + 1);
+      return newDate;
     });
-    this.analyticsLoading.set(false);
   }
 
   togglePayrollDetails(payrollId: number): void {

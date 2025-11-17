@@ -19,23 +19,6 @@
             </div>
           }
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-            <div class="relative w-full aspect-video bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden flex items-center justify-center">
-              @if (isCameraOn()) {
-                <video #videoElement autoplay playsinline class="w-full h-full object-cover"></video>
-              } @else if (capturedImageDataUrl()) {
-                <img [src]="capturedImageDataUrl()" alt="Captured photo" class="w-full h-full object-cover">
-              } @else {
-                 <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 dark:text-gray-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd" /></svg>
-              }
-              <canvas #captureCanvas class="hidden"></canvas>
-            </div>
-            <div class="space-y-3">
-              <button (click)="startCamera()" [disabled]="isCameraOn()" class="w-full flex justify-center items-center gap-2 py-2 px-4 border-2 border-indigo-500 text-indigo-500 rounded-lg text-sm font-semibold hover:bg-indigo-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300">Start Camera</button>
-              <button (click)="capturePhoto()" [disabled]="!isCameraOn()" class="w-full flex justify-center items-center gap-2 py-2 px-4 border-2 border-indigo-500 text-indigo-500 rounded-lg text-sm font-semibold hover:bg-indigo-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-300">Capture Photo</button>
-            </div>
-          </div>
-          
           <form class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4" (ngSubmit)="onSubmit()">
             <div class="md:col-span-2">
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Employee ID</label>
@@ -54,12 +37,20 @@
               <input type="text" [ngModel]="lastName()" (ngModelChange)="lastName.set($event)" name="lastName" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Age</label>
-              <input type="number" [ngModel]="age()" (ngModelChange)="age.set($event ? +$event : null)" name="age" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
-            </div>
-            <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Mobile Number</label>
               <input type="tel" [ngModel]="mobileNumber()" (ngModelChange)="mobileNumber.set($event)" name="mobileNumber" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Birth Date</label>
+              <input type="date" [ngModel]="birthDate()" (ngModelChange)="birthDate.set($event)" name="birthDate" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Age</label>
+              <input type="number" [ngModel]="age()" name="age" readonly class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-600 border-2 border-gray-300 dark:border-gray-600 focus:ring-0 text-gray-900 dark:text-gray-200 cursor-not-allowed" placeholder="Auto-calculated">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Hire Date</label>
+              <input type="date" [ngModel]="hireDate()" (ngModelChange)="hireDate.set($event)" name="hireDate" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
             </div>
             <div class="md:col-span-2">
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
@@ -84,23 +75,30 @@
             }
             
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
-              <select name="department" required [ngModel]="selectedDepartmentId()" (ngModelChange)="selectedDepartmentId.set($event)" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
-                <option value="" disabled>Select a department</option>
-                @for (dept of departments(); track dept.id) {
-                  <option [value]="dept.id">{{ dept.name }}</option>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Branch</label>
+              <select name="branch" required [ngModel]="branch()" (ngModelChange)="branch.set($event)" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200 capitalize">
+                <option value="" disabled>Select a branch</option>
+                @for(b of branches; track b) {
+                  <option [value]="b" class="capitalize">{{ b }}</option>
                 }
               </select>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Position</label>
-                <input type="text" [ngModel]="position()" (ngModelChange)="position.set($event)" name="position" required placeholder="e.g., Sales Manager" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
-            </div>
 
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Position</label>
+              <select name="position" required [ngModel]="position()" (ngModelChange)="position.set($event)" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200 capitalize">
+                <option value="" disabled>Select a position</option>
+                @for(p of positions; track p) {
+                  <option [value]="p" class="capitalize">{{ p }}</option>
+                }
+              </select>
+            </div>
+            
             <div class="md:col-span-2">
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Daily Rate (PHP)</label>
-              <input type="number" [ngModel]="dailyRate()" (ngModelChange)="dailyRate.set($event ? +$event : null)" name="dailyRate" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200" placeholder="e.g., 500.00" min="0" step="0.01">
+              <input type="number" [ngModel]="dailyRate()" name="dailyRate" readonly class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-600 border-2 border-gray-300 dark:border-gray-600 focus:ring-0 text-gray-900 dark:text-gray-200 cursor-not-allowed" placeholder="Auto-assigned">
             </div>
+
             <div class="md:col-span-2 pt-4">
               <button type="submit" [disabled]="!isFormValid()" class="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors duration-300">
                 {{ isEditMode() ? 'Save Changes' : 'Create Employee' }}

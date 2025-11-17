@@ -1,11 +1,10 @@
 <div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4 font-sans">
   <div class="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 space-y-8 border dark:border-gray-700">
     
-    @if (viewMode() === 'password') {
       <div class="text-center">
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Welcome Back</h1>
         <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Sign in with your password or use QR code.
+          Sign in to access your dashboard.
         </p>
       </div>
 
@@ -67,30 +66,6 @@
           </button>
         </div>
       </form>
-    } @else {
-      <!-- QR Scanner View -->
-      <div class="text-center">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Scan QR Code</h1>
-        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Point your device's camera at the employee ID.
-        </p>
-      </div>
-
-      <div class="relative w-full aspect-square bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden flex items-center justify-center">
-        <video #video class="w-full h-full object-cover" playsinline></video>
-        <canvas #canvas class="hidden"></canvas>
-        <div class="absolute inset-0 border-8 border-white/20 rounded-lg pointer-events-none"></div>
-         @if (loading()) {
-          <div class="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white">
-            <svg class="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p class="mt-4 font-semibold">Processing...</p>
-          </div>
-        }
-      </div>
-    }
 
     <!-- Shared Error Message Area -->
     @if (errorMessage()) {
@@ -100,25 +75,5 @@
       </div>
     }
     
-    <!-- View Mode Toggle -->
-    <div class="text-center">
-       @if (viewMode() === 'password') {
-          <button (click)="setViewMode('qr')" class="w-full text-center py-3 rounded-xl border-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white dark:hover:bg-indigo-500 dark:hover:text-white transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-indigo-500">
-            Or, Clock-in with QR Code
-          </button>
-       } @else {
-          <button (click)="setViewMode('password')" class="font-medium text-sm text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
-            Sign in with Email/Password
-          </button>
-       }
-    </div>
-
   </div>
 </div>
-
-<app-qr-login-success-modal 
-  [visible]="isQrSuccessModalVisible()"
-  [profile]="qrScannedProfile()"
-  [dtrEntry]="qrScannedDtrEntry()"
-  (close)="closeQrSuccessModal()">
-</app-qr-login-success-modal>
