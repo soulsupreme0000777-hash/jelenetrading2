@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, input, output, signal, viewChild, E
 import { FormsModule } from '@angular/forms';
 import { SupabaseService, NewUserPayload, UserWithProfile, Profile } from '../../services/supabase.service';
 import QRCode from 'qrcode';
+import { ConfirmationModalComponent } from '../confirmation-modal/confirmation-modal.component';
 
 type ModalState = 'form' | 'loading' | 'success' | 'error';
 
@@ -25,7 +26,7 @@ type Position = keyof typeof RATES[Branch];
   selector: 'app-add-employee-modal',
   templateUrl: './add-employee-modal.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, ConfirmationModalComponent],
 })
 export class AddEmployeeModalComponent {
   // Inputs & Outputs
@@ -51,6 +52,7 @@ export class AddEmployeeModalComponent {
   lastName = signal('');
   email = signal('');
   password = signal('');
+  confirmPassword = signal('');
   position = signal<Position | ''>('');
   branch = signal<Branch | ''>('');
   mobileNumber = signal('');
@@ -58,27 +60,27 @@ export class AddEmployeeModalComponent {
   birthDate = signal('');
   selectedRole = signal<'admin' | 'employee'>('employee');
   
+  modalState = signal<ModalState>('form');
+  errorMessage = signal<string | null>(null);
+  newUser = signal<UserWithProfile | null>(null);
+  
+  isConfirmCancelVisible = signal(false);
+  private initialFormState = signal<Partial<Profile & { password?: string, confirmPassword?: string }>>({});
+
   age = computed<number | null>(() => {
     const birthDateStr = this.birthDate();
     if (!birthDateStr) return null;
 
     try {
-      // Ensure the date string is valid to prevent `new Date` from returning an invalid date
       if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDateStr)) return null;
-
       const birthDate = new Date(birthDateStr);
       const today = new Date();
-      
-      // Check if birthDate is a valid date and not in the future
       if (isNaN(birthDate.getTime()) || birthDate > today) return null;
-
       let age = today.getFullYear() - birthDate.getFullYear();
       const monthDifference = today.getMonth() - birthDate.getMonth();
-      
       if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
         age--;
       }
-      
       return age >= 0 ? age : null;
     } catch (e) {
       return null;
@@ -94,13 +96,44 @@ export class AddEmployeeModalComponent {
     return null;
   });
 
-  modalState = signal<ModalState>('form');
-  errorMessage = signal<string | null>(null);
-  newUser = signal<UserWithProfile | null>(null);
+  passwordMatch = computed(() => this.isEditMode() || this.password() === this.confirmPassword());
   
   isFormValid = computed(() => {
-    const passwordValid = this.isEditMode() || this.password();
+    const passwordValid = this.isEditMode() || (this.password() && this.password().length >= 6 && this.passwordMatch());
     return this.employeeId() && this.firstName() && this.middleName() && this.lastName() && this.email() && passwordValid && this.position() && this.branch() && this.age() !== null && this.mobileNumber() && this.hireDate() && this.birthDate();
+  });
+
+  isDirty = computed(() => {
+    const initial = this.initialFormState();
+    if (this.isEditMode()) {
+        return (
+            this.employeeId() !== (initial.employee_id || '') ||
+            this.firstName() !== (initial.first_name || '') ||
+            this.middleName() !== (initial.middle_name || '') ||
+            this.lastName() !== (initial.last_name || '') ||
+            this.mobileNumber() !== (initial.mobile_number || '') ||
+            this.hireDate() !== (initial.hire_date || '') ||
+            this.birthDate() !== (initial.birth_date || '') ||
+            this.selectedRole() !== (initial.role === 'admin' ? 'admin' : 'employee') ||
+            this.position() !== ((initial.position as Position | null) || '') ||
+            this.branch() !== ((initial.branch as Branch | null) || '')
+        );
+    } else {
+        return (
+            this.employeeId() !== '' ||
+            this.firstName() !== '' ||
+            this.middleName() !== '' ||
+            this.lastName() !== '' ||
+            this.email() !== '' ||
+            this.password() !== '' ||
+            this.confirmPassword() !== '' ||
+            this.mobileNumber() !== '' ||
+            this.hireDate() !== '' ||
+            this.birthDate() !== '' ||
+            this.position() !== '' ||
+            this.branch() !== ''
+        );
+    }
   });
   
   constructor() {
@@ -109,8 +142,21 @@ export class AddEmployeeModalComponent {
         const emp = this.employeeToEdit();
         if (emp) {
           this.populateForm(emp);
+          this.initialFormState.set({ // Store initial state for dirty checking
+            employee_id: emp.employee_id,
+            first_name: emp.first_name,
+            middle_name: emp.middle_name,
+            last_name: emp.last_name,
+            mobile_number: emp.mobile_number,
+            hire_date: emp.hire_date,
+            birth_date: emp.birth_date,
+            role: emp.role,
+            position: emp.position,
+            branch: emp.branch,
+          });
         } else {
           this.resetState();
+          this.initialFormState.set({}); // Reset for "add" mode
         }
       }
     });
@@ -149,20 +195,16 @@ export class AddEmployeeModalComponent {
     } catch (error: unknown) {
       let displayMessage = 'An unexpected error occurred. Please try again.';
 
-      // Log the raw error for debugging
       console.error('Caught error during employee submission:', error);
 
-      // Extract a meaningful message from various error types
       if (error instanceof Error) {
         displayMessage = error.message;
       } else if (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
-        // Handles Supabase error objects which might not be Error instances
         displayMessage = (error as { message: string }).message;
       } else if (typeof error === 'string' && error) {
         displayMessage = error;
       }
       
-      // Make common Supabase errors more user-friendly for the UI
       if (displayMessage.includes('duplicate key value violates unique constraint')) {
         if (displayMessage.includes('profiles_employee_id_key')) {
           displayMessage = 'This Employee ID is already in use. Please choose a different one.';
@@ -197,8 +239,8 @@ export class AddEmployeeModalComponent {
         role: this.selectedRole(),
         hire_date: this.hireDate(),
         birth_date: this.birthDate(),
-        day_off_balance: 3, // Initial balance
-        sil_balance: 0,     // Initial balance
+        day_off_balance: 3,
+        sil_balance: 0,
       }
     };
 
@@ -231,7 +273,6 @@ export class AddEmployeeModalComponent {
     const { error } = await this.supabaseService.updateUserProfile(employee.id, profileData);
     if (error) {
       console.error('Error updating employee profile:', error);
-      // Re-throw the original Supabase error object so the catch block can handle it.
       throw error;
     }
     
@@ -263,10 +304,27 @@ export class AddEmployeeModalComponent {
 
   finish(): void {
     this.employeeSaved.emit();
-    this.closeModal();
+    this.closeModalAndReset();
   }
 
   closeModal(): void {
+    if (this.isDirty() && this.modalState() === 'form') {
+      this.isConfirmCancelVisible.set(true);
+    } else {
+      this.close.emit();
+    }
+  }
+
+  handleConfirmCancel(): void {
+    this.isConfirmCancelVisible.set(false);
+    this.close.emit();
+  }
+
+  handleAbortCancel(): void {
+    this.isConfirmCancelVisible.set(false);
+  }
+
+  private closeModalAndReset(): void {
     this.close.emit();
   }
 
@@ -279,6 +337,7 @@ export class AddEmployeeModalComponent {
     this.lastName.set('');
     this.email.set('');
     this.password.set('');
+    this.confirmPassword.set('');
     this.position.set('');
     this.branch.set('');
     this.mobileNumber.set('');
