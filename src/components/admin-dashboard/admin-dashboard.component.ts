@@ -37,9 +37,11 @@ interface PayrollGroup {
 
 type Notification = { type: 'success' | 'error'; message: string };
 
+type LiveStatus = 'Timed In' | 'On Break' | 'Timed Out' | 'Absent' | 'No Schedule' | 'Day Off' | 'On Leave (SIL)' | 'Emergency Leave';
+
 interface LiveEmployeeStatus {
   profile: Profile;
-  status: 'Timed In' | 'On Break' | 'Timed Out' | 'Absent' | 'Rest Day';
+  status: LiveStatus;
   todaysSchedule: string;
   lastEventTime: Date | null;
   workDurationSeconds: number;
@@ -47,12 +49,6 @@ interface LiveEmployeeStatus {
   timerDisplay: string;
   dtrEntries: DtrEntry[];
 }
-
-const BIRTH_MONTH_BONUS = {
-  'branch officer': 1200,
-  'team leader': 1000,
-  'regular staff': 500,
-} as const;
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -97,11 +93,20 @@ export class AdminDashboardComponent implements OnDestroy {
   isTimeClockModeActive = signal(false);
   scannerLoading = signal(false);
   scannerErrorMessage = signal<string | null>(null);
-  lastScanResult = signal<{ profile: Profile; dtrEntry: DtrEntry; type: 'in' | 'out' } | null>(null);
+  lastScanResult = signal<{ profile: Profile; dtrEntry: DtrEntry; status: string } | null>(null);
+  breakCountdown = signal<number | null>(null);
+  breakCountdownDisplay = computed(() => {
+    const seconds = this.breakCountdown();
+    if (seconds === null || seconds < 0) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  });
 
   private stream: MediaStream | null = null;
   private isScanning = false;
   private scanResultTimer: any;
+  private breakTimerInterval: any;
 
   filteredEmployees = computed(() => {
     const term = this.searchTerm().toLowerCase().trim();
@@ -457,16 +462,19 @@ export class AdminDashboardComponent implements OnDestroy {
         }
 
         const employeeIds = employees.map(e => e.id);
-        const [dtrRes, schedulesRes] = await Promise.all([
+        const [dtrRes, schedulesRes, statusesRes] = await Promise.all([
             this.supabaseService.getDtrEntriesForDateRange(startOfDay, endOfDay),
-            this.supabaseService.getSchedulesForDateRange(employeeIds, todayStr, todayStr)
+            this.supabaseService.getSchedulesForDateRange(employeeIds, todayStr, todayStr),
+            this.supabaseService.getStatusesForDate(employeeIds, todayStr)
         ]);
         
         if (dtrRes.error) throw dtrRes.error;
         if (schedulesRes.error) throw schedulesRes.error;
+        if (statusesRes.error) throw statusesRes.error;
 
         const dtrEntries = dtrRes.data || [];
         const schedules = schedulesRes.data || [];
+        const statusesToday = statusesRes.data || [];
         
         const dtrMap = new Map<string, DtrEntry[]>();
         dtrEntries.forEach(dtr => {
@@ -477,57 +485,72 @@ export class AdminDashboardComponent implements OnDestroy {
         
         const scheduleMap = new Map<string, EmployeeSchedule>();
         schedules.forEach(s => scheduleMap.set(s.user_id, s));
+        
+        const statusMap = new Map<string, EmployeeStatus>();
+        statusesToday.forEach(s => statusMap.set(s.user_id, s));
 
         const now = Date.now();
         const statuses = employees.map((emp): LiveEmployeeStatus => {
             const todaysEntries = dtrMap.get(emp.id) || [];
             const schedule = scheduleMap.get(emp.id);
+            const leaveStatus = statusMap.get(emp.id);
 
-            let status: LiveEmployeeStatus['status'] = 'Absent';
+            let status: LiveStatus;
             let workDurationSeconds = 0;
             let breakTimeRemainingSeconds = 3600;
             let lastEventTime: Date | null = null;
-            let todaysSchedule = 'Rest Day';
+            let todaysSchedule: string;
 
-            if (schedule) {
+            if (leaveStatus) {
+                switch(leaveStatus.status) {
+                    case 'day_off': status = 'Day Off'; break;
+                    case 'service_incentive_leave': status = 'On Leave (SIL)'; break;
+                    case 'emergency_leave': status = 'Emergency Leave'; break;
+                    default: status = 'Absent';
+                }
+                todaysSchedule = "On Leave";
+            } else if (schedule) {
                  const startTime = this.formatTimeForDisplay(schedule.work_start_time);
                  const endTime = this.formatTimeForDisplay(schedule.work_end_time);
                  todaysSchedule = `${startTime} - ${endTime}`;
-            } else {
-                 status = 'Rest Day';
-            }
-            
-            if (status !== 'Rest Day') {
-                if (todaysEntries.length === 1 && todaysEntries[0].time_in) {
+                 
+                 if (todaysEntries.length === 0) {
+                    status = 'Absent';
+                 } else if (todaysEntries.length === 1 && todaysEntries[0].time_in) {
                     status = 'Timed In';
                     lastEventTime = new Date(todaysEntries[0].time_in);
                     workDurationSeconds = (now - lastEventTime.getTime()) / 1000;
-                } else if (todaysEntries.length === 2 && todaysEntries[1].time_out) {
+                } else if (todaysEntries.length === 1 && todaysEntries[0].time_out) { // Break start
                     status = 'On Break';
                     const timeIn1 = new Date(todaysEntries[0].time_in!);
-                    const timeOut1 = new Date(todaysEntries[1].time_out!);
+                    const timeOut1 = new Date(todaysEntries[0].time_out!);
                     lastEventTime = timeOut1;
                     workDurationSeconds = (timeOut1.getTime() - timeIn1.getTime()) / 1000;
                     const elapsedBreak = (now - timeOut1.getTime()) / 1000;
                     breakTimeRemainingSeconds = 3600 - elapsedBreak;
-                } else if (todaysEntries.length === 3 && todaysEntries[2].time_in) {
+                 } else if (todaysEntries.length === 2 && todaysEntries[1].time_in) { // Break end
                     status = 'Timed In';
                     const timeIn1 = new Date(todaysEntries[0].time_in!);
-                    const timeOut1 = new Date(todaysEntries[1].time_out!);
-                    const timeIn2 = new Date(todaysEntries[2].time_in!);
+                    const timeOut1 = new Date(todaysEntries[0].time_out!);
+                    const timeIn2 = new Date(todaysEntries[1].time_in!);
                     lastEventTime = timeIn2;
                     const firstPeriod = (timeOut1.getTime() - timeIn1.getTime()) / 1000;
                     const secondPeriod = (now - timeIn2.getTime()) / 1000;
                     workDurationSeconds = firstPeriod + secondPeriod;
-                } else if (todaysEntries.length >= 4 && todaysEntries[3].time_out) {
+                } else if (todaysEntries.length >= 2 && todaysEntries[1].time_out) { // Day end
                     status = 'Timed Out';
                     const timeIn1 = new Date(todaysEntries[0].time_in!);
-                    const timeOut1 = new Date(todaysEntries[1].time_out!);
-                    const timeIn2 = new Date(todaysEntries[2].time_in!);
-                    const timeOut2 = new Date(todaysEntries[3].time_out!);
+                    const timeOut1 = new Date(todaysEntries[0].time_out!);
+                    const timeIn2 = new Date(todaysEntries[1].time_in!);
+                    const timeOut2 = new Date(todaysEntries[1].time_out!);
                     lastEventTime = timeOut2;
                     workDurationSeconds = ((timeOut1.getTime() - timeIn1.getTime()) + (timeOut2.getTime() - timeIn2.getTime())) / 1000;
+                } else {
+                    status = 'Absent'; // Fallback
                 }
+            } else {
+                 status = 'No Schedule';
+                 todaysSchedule = 'No Schedule';
             }
             
             const liveStatus: LiveEmployeeStatus = {
@@ -721,62 +744,6 @@ export class AdminDashboardComponent implements OnDestroy {
     }
   }
 
-  async exportDtrPeriodToCsv(group: DtrPayPeriodGroup): Promise<void> {
-    this.showNotification('success', 'Generating CSV export...');
-    const periodStartStr = group.payPeriodStart.toISOString().slice(0, 10);
-    
-    // Find all payroll records for this specific period start date
-    const payrollsForPeriod = this.payrolls().filter(p => p.pay_period_start.startsWith(periodStartStr));
-
-    if (payrollsForPeriod.length === 0) {
-        this.showNotification('error', 'No payroll data found for this period to export.');
-        return;
-    }
-
-    const csvRows = [];
-    // Headers
-    const headers = [
-        'Employee ID', 'Full Name', 'Late Arrivals (mins)', 
-        'Early Departures (mins)', 'Birth Month Bonus (PHP)', 'Net Pay (PHP)'
-    ];
-    csvRows.push(headers.join(','));
-
-    // Data rows
-    for (const payroll of payrollsForPeriod) {
-        const empProfile = payroll.profiles;
-        if (!empProfile) continue;
-
-        let birthMonthBonus = 0;
-        if (empProfile.birth_date && empProfile.position) {
-            const birthMonth = new Date(empProfile.birth_date).getUTCMonth();
-            const payrollEndMonth = new Date(payroll.pay_period_end).getUTCMonth();
-            if (birthMonth === payrollEndMonth) {
-                birthMonthBonus = BIRTH_MONTH_BONUS[empProfile.position as keyof typeof BIRTH_MONTH_BONUS] || 0;
-            }
-        }
-        
-        const row = [
-            `"${empProfile.employee_id || ''}"`,
-            `"${empProfile.first_name || ''} ${empProfile.middle_name || ''} ${empProfile.last_name || ''}"`,
-            payroll.lateness_minutes,
-            payroll.early_departure_minutes,
-            birthMonthBonus,
-            payroll.net_pay
-        ];
-        csvRows.push(row.join(','));
-    }
-
-    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    const fileName = `payroll_export_${group.id}.csv`;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
   async onLogout(): Promise<void> {
     this.logoutError.set(null);
     try {
@@ -828,6 +795,7 @@ export class AdminDashboardComponent implements OnDestroy {
     if (this.scanResultTimer) {
         clearTimeout(this.scanResultTimer);
     }
+    this.stopBreakTimer();
     if (this.stream) {
         this.stream.getTracks().forEach(track => track.stop());
         this.stream = null;
@@ -835,6 +803,28 @@ export class AdminDashboardComponent implements OnDestroy {
     const videoEl = this.video()?.nativeElement;
     if (videoEl) {
         videoEl.srcObject = null;
+    }
+  }
+
+  private startBreakTimer(): void {
+    this.stopBreakTimer();
+    this.breakCountdown.set(3600); // 1 hour in seconds
+    this.breakTimerInterval = setInterval(() => {
+      this.breakCountdown.update(val => {
+        if (val === null || val <= 0) {
+          this.stopBreakTimer();
+          return 0;
+        }
+        return val - 1;
+      });
+    }, 1000);
+  }
+
+  private stopBreakTimer(): void {
+    if (this.breakTimerInterval) {
+      clearInterval(this.breakTimerInterval);
+      this.breakTimerInterval = null;
+      this.breakCountdown.set(null);
     }
   }
 
@@ -870,6 +860,7 @@ export class AdminDashboardComponent implements OnDestroy {
   private async handleQrCodeScan(qrData: string): Promise<void> {
     this.scannerLoading.set(true);
     this.scannerErrorMessage.set(null);
+    this.stopBreakTimer();
     
     if (this.scanResultTimer) {
         clearTimeout(this.scanResultTimer);
@@ -881,14 +872,14 @@ export class AdminDashboardComponent implements OnDestroy {
             throw new Error('Invalid QR code format.');
         }
         
-        const { profile, dtrEntry } = await this.supabaseService.handleQrCodeLogin(parsedData.userId);
+        const { profile, dtrEntry, status } = await this.supabaseService.handleQrCodeLogin(parsedData.userId);
 
-        this.lastScanResult.set({
-            profile,
-            dtrEntry,
-            type: dtrEntry.time_out ? 'out' : 'in',
-        });
+        this.lastScanResult.set({ profile, dtrEntry, status });
         
+        if (status === 'CLOCK_OUT_BREAK') {
+            this.startBreakTimer();
+        }
+
         // Hide message and restart scan after 5 seconds
         this.scanResultTimer = setTimeout(() => {
             this.lastScanResult.set(null);

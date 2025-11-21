@@ -12,13 +12,14 @@ import { SupabaseService } from '../../services/supabase.service';
 export class LoginComponent {
   // Form Group for password login
   loginForm = new FormGroup({
-    email: new FormControl('admin@gmail.com', [Validators.required, Validators.email]),
-    password: new FormControl('123456', [Validators.required]),
+    email: new FormControl('', [Validators.required, Validators.email]),
+    password: new FormControl('', [Validators.required]),
   });
 
   // State Signals
   loading = signal(false);
   errorMessage = signal<string | null>(null);
+  passwordVisible = signal(false);
 
   // Services & Router
   private readonly supabaseService = inject(SupabaseService);
@@ -48,6 +49,10 @@ export class LoginComponent {
   // Helper getters for template
   get email() { return this.loginForm.get('email'); }
   get password() { return this.loginForm.get('password'); }
+
+  togglePasswordVisibility(): void {
+    this.passwordVisible.update(visible => !visible);
+  }
 
   async onSubmit(): Promise<void> {
     if (this.loginForm.invalid) {

@@ -278,10 +278,6 @@
                       <button (click)="openRunPayrollForPeriod(group); $event.stopPropagation()" class="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md shadow-sm hover:bg-indigo-700">
                         Run Payroll
                       </button>
-                    } @else {
-                      <button (click)="exportDtrPeriodToCsv(group); $event.stopPropagation()" class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 dark:bg-gray-600 dark:text-white dark:border-gray-500">
-                        Export CSV
-                      </button>
                     }
                     <svg class="w-6 h-6 text-gray-500 dark:text-gray-400 transition-transform duration-300" [class.rotate-180]="openDtrPeriods().has(group.id)" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -431,14 +427,24 @@
                       <span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full"
                         [class.bg-green-100]="item.status === 'Timed In'" [class.text-green-800]="item.status === 'Timed In'"
                         [class.dark:bg-green-900/50]="item.status === 'Timed In'" [class.dark:text-green-300]="item.status === 'Timed In'"
+                        
                         [class.bg-yellow-100]="item.status === 'On Break'" [class.text-yellow-800]="item.status === 'On Break'"
                         [class.dark:bg-yellow-900/50]="item.status === 'On Break'" [class.dark:text-yellow-300]="item.status === 'On Break'"
+                        
                         [class.bg-blue-100]="item.status === 'Timed Out'" [class.text-blue-800]="item.status === 'Timed Out'"
                         [class.dark:bg-blue-900/50]="item.status === 'Timed Out'" [class.dark:text-blue-300]="item.status === 'Timed Out'"
+                        
                         [class.bg-red-100]="item.status === 'Absent'" [class.text-red-800]="item.status === 'Absent'"
                         [class.dark:bg-red-900/50]="item.status === 'Absent'" [class.dark:text-red-300]="item.status === 'Absent'"
-                        [class.bg-gray-100]="item.status === 'Rest Day'" [class.text-gray-800]="item.status === 'Rest Day'"
-                        [class.dark:bg-gray-700]="item.status === 'Rest Day'" [class.dark:text-gray-300]="item.status === 'Rest Day'">
+                        
+                        [class.bg-gray-100]="item.status === 'No Schedule'" [class.text-gray-800]="item.status === 'No Schedule'"
+                        [class.dark:bg-gray-700]="item.status === 'No Schedule'" [class.dark:text-gray-300]="item.status === 'No Schedule'"
+
+                        [class.bg-cyan-100]="item.status === 'Day Off' || item.status === 'On Leave (SIL)'" [class.text-cyan-800]="item.status === 'Day Off' || item.status === 'On Leave (SIL)'"
+                        [class.dark:bg-cyan-900/50]="item.status === 'Day Off' || item.status === 'On Leave (SIL)'" [class.dark:text-cyan-300]="item.status === 'Day Off' || item.status === 'On Leave (SIL)'"
+                        
+                        [class.bg-orange-100]="item.status === 'Emergency Leave'" [class.text-orange-800]="item.status === 'Emergency Leave'"
+                        [class.dark:bg-orange-900/50]="item.status === 'Emergency Leave'" [class.dark:text-orange-300]="item.status === 'Emergency Leave'">
                         {{ item.status }}
                       </span>
                     </div>
@@ -510,14 +516,38 @@
           <canvas #canvas class="hidden"></canvas>
 
           @if (lastScanResult(); as result) {
-            <div class="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-8 animate-fade-in">
-                @if(result.type === 'in') {
-                    <span class="text-3xl font-bold text-green-400">Timed In</span>
-                } @else {
-                    <span class="text-3xl font-bold text-red-400">Timed Out</span>
+            <div class="absolute inset-0 flex flex-col items-center justify-center text-center bg-black/80 text-white p-8 animate-fade-in">
+              @switch(result.status) {
+                @case('CLOCK_IN_WORK') {
+                  <div class="w-full max-w-md p-6 rounded-lg bg-green-500/20 border border-green-500">
+                    <h3 class="text-3xl font-bold text-green-300">Timed In for Work</h3>
+                    <p class="mt-2 text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
+                    <p class="mt-4 text-gray-300">Your shift has started. Your next scan will be to clock out for your break.</p>
+                  </div>
                 }
-                <span class="mt-4 text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</span>
-                <span class="mt-2 text-2xl text-gray-300">{{ result.dtrEntry.time_in | date:'mediumTime' }}</span>
+                @case('CLOCK_OUT_BREAK') {
+                  <div class="w-full max-w-md p-6 rounded-lg bg-yellow-500/20 border border-yellow-500">
+                    <h3 class="text-3xl font-bold text-yellow-300">Started Break</h3>
+                    <p class="mt-2 text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
+                    <p class="mt-4 text-4xl font-mono tracking-widest">{{ breakCountdownDisplay() }}</p>
+                    <p class="mt-2 text-gray-300">Your 1-hour break has begun. Your next scan will be to clock back in.</p>
+                  </div>
+                }
+                 @case('CLOCK_IN_BREAK') {
+                  <div class="w-full max-w-md p-6 rounded-lg bg-green-500/20 border border-green-500">
+                    <h3 class="text-3xl font-bold text-green-300">Resumed Work</h3>
+                    <p class="mt-2 text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
+                    <p class="mt-4 text-gray-300">Your break has ended. Your next scan will be to clock out for the day.</p>
+                  </div>
+                }
+                @case('CLOCK_OUT_DAY') {
+                   <div class="w-full max-w-md p-6 rounded-lg bg-blue-500/20 border border-blue-500">
+                    <h3 class="text-3xl font-bold text-blue-300">Timed Out for the Day</h3>
+                    <p class="mt-2 text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
+                    <p class="mt-4 text-gray-300">Your workday has ended. See you tomorrow!</p>
+                  </div>
+                }
+              }
             </div>
           }
 

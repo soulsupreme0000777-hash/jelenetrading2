@@ -1,22 +1,23 @@
 import { Component, ChangeDetectionStrategy, input, output, signal, computed, inject, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { SupabaseService, Profile, DtrEntry, Payroll, SalaryRule, EmployeeSchedule } from '../../services/supabase.service';
+import { SupabaseService, Profile, DtrEntry, Payroll, SalaryRule, EmployeeSchedule, EmployeeStatus } from '../../services/supabase.service';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 
 interface PayrollPreview {
   employeeId: string;
   employeeName: string;
   daysWorked: number;
+  leaveDays: number;
   totalHours: number;
   dailyRate: number;
   baseGrossPay: number;
-  thirteenthMonthPay: number;
+  salaryRaise: number;
   birthMonthBonus: number;
   totalGrossPay: number;
   totalMinutesLate: number;
-  totalMinutesEarly: number;
+  totalMinutesUnderTime: number;
   latenessDeductions: number;
-  earlyDepartureDeductions: number;
+  underTimeDeductions: number;
   manualDeductions: number;
   netPay: number;
   selected: boolean;
@@ -85,115 +86,151 @@ export class RunPayrollModalComponent {
 
       const employeeIds = employees.map(e => e.id);
 
-      // --- Determine date range for data fetching ---
-      const currentYear = payrollEndDate.getFullYear();
-      const yearStartDate = new Date(Date.UTC(currentYear, 0, 1));
-      
-      const { data: yearlyDtrEntries, error: dtrError } = await this.supabaseService.getDtrEntriesForDateRange(yearStartDate.toISOString(), payrollEndDate.toISOString());
-      if (dtrError) throw dtrError;
+      const [dtrRes, schedulesRes, salaryRulesRes, statusesRes] = await Promise.all([
+          this.supabaseService.getDtrEntriesForDateRange(payrollStartDate.toISOString(), payrollEndDate.toISOString()),
+          this.supabaseService.getSchedulesForDateRange(employeeIds, payrollStartDate.toISOString().slice(0, 10), payrollEndDate.toISOString().slice(0, 10)),
+          this.supabaseService.getActiveSalaryRules(),
+          this.supabaseService.getAllStatusesForDateRange(employeeIds, payrollStartDate.toISOString().slice(0, 10), payrollEndDate.toISOString().slice(0, 10))
+      ]);
 
-      const { data: yearlySchedules, error: schedError } = await this.supabaseService.getSchedulesForDateRange(employeeIds, yearStartDate.toISOString().slice(0, 10), payrollEndDate.toISOString().slice(0, 10));
-      if(schedError) throw schedError;
+      if (dtrRes.error) throw dtrRes.error;
+      const dtrEntries = dtrRes.data || [];
+      
+      if (schedulesRes.error) throw schedulesRes.error;
+      const schedules = schedulesRes.data || [];
+      
+      if(salaryRulesRes.error) throw salaryRulesRes.error;
+      const activeSalaryRules = salaryRulesRes.data || [];
+
+      if (statusesRes.error) throw statusesRes.error;
+      const leaveStatuses = statusesRes.data || [];
 
       const schedulesMap = new Map<string, EmployeeSchedule>();
-      yearlySchedules?.forEach(s => schedulesMap.set(`${s.user_id}|${s.date}`, s));
+      schedules.forEach(s => schedulesMap.set(`${s.user_id}|${s.date}`, s));
+
+      const leaveMap = new Map<string, EmployeeStatus>();
+      leaveStatuses.forEach(s => leaveMap.set(`${s.user_id}|${s.date}`, s));
       
       const previews: PayrollPreview[] = [];
       
       for (const emp of employees) {
         if (!emp.id || !emp.daily_rate) continue;
         
-        const empDtr = yearlyDtrEntries?.filter(d => d.user_id === emp.id) || [];
-        if (empDtr.length === 0) continue;
+        const empDtr = dtrEntries.filter(d => d.user_id === emp.id);
         
-        // --- Calculations for current pay period ---
+        const dtrByDay: Record<string, DtrEntry[]> = {};
+        empDtr.forEach(dtr => {
+            if (dtr.time_in) {
+                const day = new Date(dtr.time_in).toISOString().slice(0, 10);
+                if (!dtrByDay[day]) dtrByDay[day] = [];
+                dtrByDay[day].push(dtr);
+            }
+        });
+        
         let daysWorkedInPeriod = 0;
+        let leaveDaysInPeriod = 0;
         let totalHoursInPeriod = 0;
         let totalMinutesLate = 0;
-        let totalMinutesEarly = 0;
+        let totalMinutesUnderTime = 0;
+        let baseGrossPay = 0;
+        let salaryRaise = 0;
 
-        const dtrByDay: Record<string, DtrEntry[]> = {};
-        for (const dtr of empDtr) {
-            if (dtr.time_in) {
-                const entryDate = new Date(dtr.time_in);
-                if (entryDate >= payrollStartDate && entryDate <= payrollEndDate) {
-                    const day = entryDate.toISOString().slice(0, 10);
-                    if (!dtrByDay[day]) dtrByDay[day] = [];
-                    dtrByDay[day].push(dtr);
-                }
+        // Iterate through each day of the pay period
+        for (let day = new Date(payrollStartDate); day <= payrollEndDate; day.setDate(day.getDate() + 1)) {
+            const dateKey = day.toISOString().slice(0, 10);
+            const schedule = schedulesMap.get(`${emp.id}|${dateKey}`);
+            const leave = leaveMap.get(`${emp.id}|${dateKey}`);
+
+            if (leave) {
+                leaveDaysInPeriod++;
+                continue; // Skip DTR calculations for leave days
+            }
+
+            if (!schedule) continue; // Not a scheduled workday
+
+            const dailyEntries = dtrByDay[dateKey];
+            if (!dailyEntries || dailyEntries.length === 0) continue; // Absent
+
+            daysWorkedInPeriod++;
+
+            dailyEntries.sort((a, b) => new Date(a.time_in!).getTime() - new Date(b.time_in!).getTime());
+            
+            let dailyWorkDurationMs = 0;
+            dailyEntries.forEach(dtr => {
+              if (dtr.time_in && dtr.time_out) {
+                dailyWorkDurationMs += new Date(dtr.time_out).getTime() - new Date(dtr.time_in).getTime();
+              }
+            });
+            const dailyWorkDurationHours = dailyWorkDurationMs / (1000 * 60 * 60);
+            totalHoursInPeriod += dailyWorkDurationHours;
+
+            const timeIn = new Date(dailyEntries[0].time_in!);
+            const expectedStart = new Date(`${dateKey}T${schedule.work_start_time}Z`);
+            const minutesLate = (timeIn.getTime() - expectedStart.getTime()) / (1000 * 60);
+            if (minutesLate > GRACE_PERIOD_MINUTES) {
+                totalMinutesLate += Math.round(minutesLate);
+            }
+
+            const scheduleStart = new Date(`${dateKey}T${schedule.work_start_time}Z`);
+            const scheduleEnd = new Date(`${dateKey}T${schedule.work_end_time}Z`);
+            const requiredWorkMs = scheduleEnd.getTime() - scheduleStart.getTime();
+            const requiredWorkHours = (requiredWorkMs / (1000*60*60)) - 1; // Assume 1-hour break
+            
+            if (dailyWorkDurationHours < requiredWorkHours) {
+              totalMinutesUnderTime += Math.round((requiredWorkHours - dailyWorkDurationHours) * 60);
+            }
+
+            for (const rule of activeSalaryRules) {
+              const ruleStart = new Date(rule.start_date);
+              const ruleEnd = new Date(rule.end_date);
+              if (day >= ruleStart && day <= ruleEnd) {
+                salaryRaise += emp.daily_rate * (rule.raise_percentage / 100);
+              }
             }
         }
+
+        if (daysWorkedInPeriod === 0 && leaveDaysInPeriod === 0) continue;
         
-        for (const dateKey of Object.keys(dtrByDay)) {
-          const schedule = schedulesMap.get(`${emp.id}|${dateKey}`);
-          if (!schedule) continue; // Skip days without a schedule
+        baseGrossPay = (daysWorkedInPeriod + leaveDaysInPeriod) * emp.daily_rate;
 
-          const dailyEntries = dtrByDay[dateKey];
-          dailyEntries.sort((a, b) => new Date(a.time_in!).getTime() - new Date(b.time_in!).getTime());
-
-          let dailyWorkDurationHours = 0;
-          dailyEntries.forEach(dtr => {
-            if (dtr.time_in && dtr.time_out) {
-              dailyWorkDurationHours += (new Date(dtr.time_out).getTime() - new Date(dtr.time_in).getTime()) / (1000 * 60 * 60);
-            }
-          });
-
-          if (dailyWorkDurationHours < 8) continue;
-          
-          daysWorkedInPeriod++;
-          totalHoursInPeriod += Math.min(dailyWorkDurationHours, 8); // Cap payable hours at 8
-
-          const timeIn = new Date(dailyEntries[0].time_in!);
-          const expectedStart = new Date(`${dateKey}T${schedule.work_start_time}Z`);
-          if (timeIn.getTime() > expectedStart.getTime() + (GRACE_PERIOD_MINUTES * 60 * 1000)) {
-            totalMinutesLate += Math.round((timeIn.getTime() - expectedStart.getTime()) / (1000 * 60));
-          }
-          
-          if (dailyEntries[dailyEntries.length - 1].time_out) {
-            const timeOut = new Date(dailyEntries[dailyEntries.length - 1].time_out!);
-            const expectedEnd = new Date(`${dateKey}T${schedule.work_end_time}Z`);
-            if (timeOut.getTime() < expectedEnd.getTime()) {
-              totalMinutesEarly += Math.round((expectedEnd.getTime() - timeOut.getTime()) / (1000 * 60));
-            }
-          }
-        }
-
-        if (daysWorkedInPeriod === 0) continue;
-
-        const baseGrossPay = daysWorkedInPeriod * emp.daily_rate;
         const latenessDeductions = totalMinutesLate * DEDUCTION_RATE_PER_MINUTE;
-        const earlyDepartureDeductions = totalMinutesEarly * DEDUCTION_RATE_PER_MINUTE;
+        const underTimeDeductions = totalMinutesUnderTime * DEDUCTION_RATE_PER_MINUTE;
 
-        // --- Bonus Calculations ---
         let birthMonthBonus = 0;
         if (emp.birth_date && emp.position) {
-            const birthMonth = new Date(emp.birth_date).getUTCMonth();
-            const payrollEndMonth = payrollEndDate.getUTCMonth();
-            if (birthMonth === payrollEndMonth) {
+            // Get the birth month (0-11) from the employee's profile.
+            // This avoids timezone issues from `new Date()`.
+            const birthMonth = parseInt(emp.birth_date.split('-')[1], 10) - 1;
+
+            // Get the months covered by the pay period.
+            const payPeriodStartMonth = payrollStartDate.getUTCMonth();
+            const payPeriodEndMonth = payrollEndDate.getUTCMonth();
+
+            // Grant the bonus if the employee's birth month is one of the months
+            // covered by the current pay period.
+            if (birthMonth === payPeriodStartMonth || birthMonth === payPeriodEndMonth) {
                 birthMonthBonus = BIRTH_MONTH_BONUS[emp.position as keyof typeof BIRTH_MONTH_BONUS] || 0;
             }
         }
 
-        // 13th month is no longer a checkbox, so it's always 0 here.
-        const thirteenthMonthPay = 0;
-
-        const totalGrossPay = baseGrossPay + thirteenthMonthPay + birthMonthBonus;
-        const netPay = totalGrossPay - latenessDeductions - earlyDepartureDeductions;
+        const totalGrossPay = baseGrossPay + salaryRaise + birthMonthBonus;
+        const netPay = Math.max(0, totalGrossPay - latenessDeductions - underTimeDeductions);
         
         previews.push({
           employeeId: emp.id,
           employeeName: `${emp.first_name} ${emp.last_name}`,
           daysWorked: daysWorkedInPeriod,
+          leaveDays: leaveDaysInPeriod,
           totalHours: parseFloat(totalHoursInPeriod.toFixed(2)),
           dailyRate: emp.daily_rate,
           baseGrossPay: parseFloat(baseGrossPay.toFixed(2)),
-          thirteenthMonthPay: parseFloat(thirteenthMonthPay.toFixed(2)),
+          salaryRaise: parseFloat(salaryRaise.toFixed(2)),
           birthMonthBonus: parseFloat(birthMonthBonus.toFixed(2)),
           totalGrossPay: parseFloat(totalGrossPay.toFixed(2)),
           totalMinutesLate,
-          totalMinutesEarly,
+          totalMinutesUnderTime,
           latenessDeductions: parseFloat(latenessDeductions.toFixed(2)),
-          earlyDepartureDeductions: parseFloat(earlyDepartureDeductions.toFixed(2)),
+          underTimeDeductions: parseFloat(underTimeDeductions.toFixed(2)),
           manualDeductions: 0,
           netPay: parseFloat(netPay.toFixed(2)),
           selected: true,
@@ -235,7 +272,8 @@ export class RunPayrollModalComponent {
     this.payrollPreviews.update(previews => 
       previews.map(p => {
         if (p.employeeId === employeeId) {
-          const netPay = p.totalGrossPay - p.latenessDeductions - p.earlyDepartureDeductions - newManualDeduction;
+          const totalDeductions = p.latenessDeductions + p.underTimeDeductions + newManualDeduction;
+          const netPay = Math.max(0, p.totalGrossPay - totalDeductions);
           return { ...p, manualDeductions: newManualDeduction, netPay: parseFloat(netPay.toFixed(2)) };
         }
         return p;
@@ -252,19 +290,32 @@ export class RunPayrollModalComponent {
     try {
       const selectedPayrolls = this.payrollPreviews().filter(p => p.selected);
       
-      const payrollsToInsert: Omit<Payroll, 'id' | 'created_at' | 'status'>[] = selectedPayrolls.map(p => ({
-        user_id: p.employeeId,
-        pay_period_start: period.start.toISOString(),
-        pay_period_end: period.end.toISOString(),
-        total_hours: p.totalHours,
-        gross_pay: p.totalGrossPay,
-        lateness_minutes: p.totalMinutesLate,
-        early_departure_minutes: p.totalMinutesEarly,
-        lateness_deductions: p.latenessDeductions,
-        early_departure_deductions: p.earlyDepartureDeductions,
-        manual_deductions: p.manualDeductions,
-        net_pay: p.netPay,
-      }));
+      const payrollsToInsert = selectedPayrolls.map(p => {
+        const payrollData: any = {
+          user_id: p.employeeId,
+          pay_period_start: period.start.toISOString(),
+          pay_period_end: period.end.toISOString(),
+          total_hours: p.totalHours,
+          gross_pay: p.totalGrossPay,
+          salary_raise: p.salaryRaise,
+          lateness_minutes: p.totalMinutesLate,
+          undertime_minutes: p.totalMinutesUnderTime,
+          lateness_deductions: p.latenessDeductions,
+          undertime_deductions: p.underTimeDeductions,
+          manual_deductions: p.manualDeductions,
+          net_pay: p.netPay
+        };
+        
+        // --- FIX for recurring "early_departure_minutes" database error ---
+        // To prevent crashes from an out-of-sync database schema, we explicitly add
+        // default values for old, deprecated columns that might still have a
+        // NOT-NULL constraint in the user's database. The correct data is still
+        // saved in the 'undertime_minutes' and 'undertime_deductions' columns.
+        payrollData.early_departure_minutes = 0;
+        payrollData.early_departure_deductions = 0;
+        
+        return payrollData;
+      });
       
       if (payrollsToInsert.length === 0) {
         this.errorMessage.set('No employees selected to run payroll for.');
@@ -272,7 +323,7 @@ export class RunPayrollModalComponent {
         return;
       }
       
-      const { error } = await this.supabaseService.runPayrollForEmployees(payrollsToInsert);
+      const { error } = await this.supabaseService.runPayrollForEmployees(payrollsToInsert as any);
       if (error) throw error;
       
       this.modalState.set('success');

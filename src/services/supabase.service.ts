@@ -66,10 +66,11 @@ export interface Payroll {
   pay_period_end: string;
   total_hours: number;
   gross_pay: number;
+  salary_raise: number;
   lateness_minutes: number;
-  early_departure_minutes: number;
+  undertime_minutes: number;
   lateness_deductions: number;
-  early_departure_deductions: number;
+  undertime_deductions: number;
   manual_deductions: number;
   net_pay: number;
   created_at: string;
@@ -95,63 +96,77 @@ export interface NewUserPayload {
 
 export type UserWithProfile = User & { profile: Profile | null };
 
-// --- CRITICAL DATABASE SETUP SCRIPT (V3) ---
-// If data is not showing up or you see a "Profile Not Found" error, it means
-// your new database is missing critical setup steps.
+// --- RECOMMENDED DATABASE CLEANUP SCRIPT (V6) ---
+// The application code has been updated to work around the "early_departure_minutes"
+// error. Running the script below is recommended for long-term database health
+// but is no longer critical for the app to function.
 //
-// To fix this permanently, run this entire script in your Supabase project's
-// SQL Editor ONE TIME. It is safe to run multiple times.
-
+// Run this script in your Supabase SQL Editor to safely remove old columns.
 /*
 -- =================================================================
--- V3: COMPLETE SUPABASE DATABASE SETUP SCRIPT
+-- V6: SIMPLIFIED DATABASE CLEANUP SCRIPT
 -- =================================================================
--- This script fixes the "infinite recursion" error AND ensures new users
--- get a profile automatically, which is a common issue when migrating databases.
+-- NOTE: The application code has been updated to work even if your database
+-- schema is out of date. This script is now for cleanup and long-term
+-- database health. Running this is recommended but no longer critical
+-- to prevent the "early_departure_minutes" error.
 --
--- Run this entire script in your Supabase SQL Editor ONCE.
+-- This script safely removes old, incorrectly named columns from the 'payrolls' table.
+-- It is idempotent, meaning it is SAFE TO RUN MULTIPLE TIMES.
 -- =================================================================
 
--- Step 1: Create the function to auto-create a profile for new users.
--- This function is called by a trigger when a new user signs up.
+-- Step 1: Drop the old, incorrectly named 'minutes' column if it exists.
+ALTER TABLE public.payrolls DROP COLUMN IF EXISTS early_departure_minutes;
+
+-- Step 2: Drop the old, incorrectly named 'deductions' column if it exists.
+ALTER TABLE public.payrolls DROP COLUMN IF EXISTS early_departure_deductions;
+
+-- Step 3: (From previous versions, included for completeness) Ensure all required columns exist.
+-- This ensures the schema is correct going forward. It's safe to run this again.
+ALTER TABLE public.payrolls
+  ADD COLUMN IF NOT EXISTS salary_raise NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS lateness_minutes INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS undertime_minutes INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS lateness_deductions NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS undertime_deductions NUMERIC NOT NULL DEFAULT 0;
+
+-- Step 4: Create essential database functions.
+
+-- Function to auto-create a profile for new users.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER -- Allows the function to bypass RLS to insert the profile.
-SET search_path = public
-AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  -- Insert a new profile record for the new user, defaulting their role to 'employee'.
-  -- The user's ID and email are taken from the new user record in auth.users.
   INSERT INTO public.profiles (id, email, role)
   VALUES (new.id, new.email, 'employee');
   RETURN new;
 END;
 $$;
 
--- Step 2: Create the trigger that calls the function.
--- This ensures that every time a user is created in the authentication system,
--- their profile is automatically created in the public table.
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users; -- Drop old trigger if it exists
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
-
--- Step 3: Create a helper function to safely get the current user's role.
--- This function is used in RLS policies to avoid infinite recursion.
+-- Function to safely get the current user's role for RLS policies.
 CREATE OR REPLACE FUNCTION public.get_my_role()
-RETURNS TEXT
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
+RETURNS TEXT LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  -- It safely queries the profiles table for the role of the currently logged-in user.
   RETURN (SELECT role FROM profiles WHERE id = auth.uid() LIMIT 1);
 END;
 $$;
 
--- Step 4: Enable Row Level Security (RLS) on all tables if not already enabled.
+-- Function to securely delete a user from the auth system.
+CREATE OR REPLACE FUNCTION public.delete_auth_user(user_id_to_delete uuid)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  DELETE FROM auth.users u WHERE u.id = user_id_to_delete;
+  RETURN 'User deleted successfully from auth schema.';
+END;
+$$;
+-- Note: Ensure your 'profiles' table has a foreign key to 'auth.users(id)' with 'ON DELETE CASCADE'.
+
+-- Step 5: Create triggers.
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- Step 6: Enable Row Level Security (RLS) on all tables.
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dtr_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payrolls ENABLE ROW LEVEL SECURITY;
@@ -159,59 +174,40 @@ ALTER TABLE public.employee_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employee_status ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.salary_rules ENABLE ROW LEVEL SECURITY;
 
--- Step 5: Drop all old policies to ensure a clean slate.
--- This removes any previous, potentially incorrect RLS rules.
-DO $$
-DECLARE
-    r RECORD;
+-- Step 7: Drop all old policies to ensure a clean slate.
+DO $$ DECLARE r RECORD;
 BEGIN
     FOR r IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public') LOOP
         EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(r.policyname) || ' ON public.' || quote_ident(r.tablename);
     END LOOP;
 END $$;
 
-
--- Step 6: Create comprehensive RLS policies for all tables.
--- These rules define who can see and modify data.
+-- Step 8: Create comprehensive RLS policies for all tables.
 
 -- === PROFILES ===
--- Users can see their own profile.
 CREATE POLICY "Allow individuals to view their own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
--- Users can update their own profile (though the UI restricts this, the policy allows it).
 CREATE POLICY "Allow individuals to update their own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
--- Admins can manage all profiles.
 CREATE POLICY "Allow admins to manage all profiles" ON public.profiles FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
 
 -- === DTR ENTRIES ===
--- Users can view their own DTR entries.
 CREATE POLICY "Allow individuals to view their own DTR entries" ON public.dtr_entries FOR SELECT USING (auth.uid() = user_id);
--- Users can create their own DTR entries (when they clock in/out).
 CREATE POLICY "Allow individuals to create their own DTR entries" ON public.dtr_entries FOR INSERT WITH CHECK (auth.uid() = user_id);
--- Admins can manage all DTR entries.
 CREATE POLICY "Allow admins to manage all DTR entries" ON public.dtr_entries FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
 
 -- === PAYROLLS ===
--- Users can view their own payrolls.
 CREATE POLICY "Allow individuals to view their own payrolls" ON public.payrolls FOR SELECT USING (auth.uid() = user_id);
--- Admins can manage all payrolls.
 CREATE POLICY "Allow admins to manage all payrolls" ON public.payrolls FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
 
 -- === EMPLOYEE SCHEDULES ===
--- Users can view their own schedules.
 CREATE POLICY "Allow individuals to view their own schedules" ON public.employee_schedules FOR SELECT USING (auth.uid() = user_id);
--- Admins can manage all schedules.
 CREATE POLICY "Allow admins to manage all schedules" ON public.employee_schedules FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
 
 -- === EMPLOYEE STATUS (LEAVE) ===
--- Users can view their own status/leave records.
 CREATE POLICY "Allow individuals to view their own status" ON public.employee_status FOR SELECT USING (auth.uid() = user_id);
--- Users can create their own status/leave records.
 CREATE POLICY "Allow individuals to create their own status" ON public.employee_status FOR INSERT WITH CHECK (auth.uid() = user_id);
--- Admins can manage all statuses.
 CREATE POLICY "Allow admins to manage all statuses" ON public.employee_status FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
 
 -- === SALARY RULES ===
--- Salary rules are admin-only.
 CREATE POLICY "Allow admins to manage salary rules" ON public.salary_rules FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
 
 */
@@ -308,33 +304,8 @@ export class SupabaseService {
   }
 
   deleteUserAndProfile(userId: string) {
-    // --- REQUIRED DATABASE SETUP ---
-    // To securely delete a user, we must call a PostgreSQL function in Supabase.
-    // The error "Could not find the function public.delete_auth_user" means this
-    // function has not been created in your database yet.
-    //
-    // Please go to your Supabase project's SQL Editor and run the following query ONE TIME:
-    /*
-    CREATE OR REPLACE FUNCTION delete_auth_user(user_id_to_delete uuid)
-    RETURNS text
-    LANGUAGE plpgsql
-    SECURITY DEFINER
-    AS $$
-    BEGIN
-      -- This function runs with the permissions of the function owner (postgres),
-      -- allowing it to bypass RLS and delete from the auth.users table.
-      DELETE FROM auth.users u WHERE u.id = user_id_to_delete;
-      
-      -- The user's profile in the public.profiles table will be deleted automatically
-      -- if you have a foreign key with 'ON DELETE CASCADE' set up.
-      
-      RETURN 'User deleted successfully from auth schema.';
-    END;
-    $$;
-    */
-    // NOTE: Make sure your 'profiles' table has a foreign key constraint
-    // to 'auth.users(id)' that is set to 'ON DELETE CASCADE'.
-    
+    // This RPC call requires the `delete_auth_user` function to be created in your database.
+    // This function is included in the main database setup script at the top of this file.
     return this.supabase.rpc('delete_auth_user', { user_id_to_delete: userId });
   }
 
@@ -414,54 +385,118 @@ export class SupabaseService {
 
   // --- DTR (Daily Time Record) ---
 
+  /**
+   * Returns the start and end of the current day in Philippine Standard Time (UTC+8).
+   */
+  private getTodayPSTBounds(): { startOfDay: Date; endOfDay: Date } {
+    const now = new Date();
+    const localTime = now.getTime();
+    const localOffset = now.getTimezoneOffset() * 60000;
+    const utc = localTime + localOffset;
+    const phTime = new Date(utc + 3600000 * 8); // UTC+8
+
+    const startOfDay = new Date(phTime);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(phTime);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return { startOfDay, endOfDay };
+  }
+
   async handleQrCodeLogin(userId: string) {
     // 1. Fetch user's profile
     const { data: profile, error: profileError } = await this.supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .maybeSingle(); // Use maybeSingle to prevent crash on no rows
+      .maybeSingle();
     if (profileError) throw profileError;
-    if (!profile) throw new Error('User not found.'); // Explicitly handle null profile
+    if (!profile) throw new Error('User not found.');
     
-    // Check for the last DTR entry for today
-    const today = new Date().toISOString().slice(0, 10);
-    const { data: lastEntry, error: dtrError } = await this.supabase
+    // 2. Determine current time in PST for all operations
+    const { startOfDay, endOfDay } = this.getTodayPSTBounds();
+    const nowPST = new Date(new Date().getTime() + (new Date().getTimezoneOffset() * 60000) + (3600000 * 8));
+
+    // 3. Fetch all DTR entries for today (in PST)
+    const { data: todaysEntries, error: dtrError } = await this.supabase
       .from('dtr_entries')
       .select('*')
       .eq('user_id', userId)
-      .gte('created_at', `${today}T00:00:00.000Z`)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .gte('created_at', startOfDay.toISOString())
+      .lte('created_at', endOfDay.toISOString())
+      .order('created_at', { ascending: true });
 
     if (dtrError) throw dtrError;
 
+    const entryCount = todaysEntries.length;
+    const lastEntry = todaysEntries[entryCount - 1];
+    
     let dtrEntry: DtrEntry;
+    let status: string;
 
-    if (!lastEntry || lastEntry.time_out) {
-      // Time IN
-      const { data: newEntry, error: insertError } = await this.supabase
+    if (entryCount === 0) {
+      // Action 1: First scan of the day - Clock-In for Work
+      status = 'CLOCK_IN_WORK';
+      const { data, error } = await this.supabase
         .from('dtr_entries')
-        .insert({ user_id: userId, time_in: new Date().toISOString() })
+        .insert({ user_id: userId, time_in: nowPST.toISOString() })
         .select()
         .single();
-      if (insertError) throw insertError;
-      dtrEntry = newEntry;
-    } else {
-      // Time OUT
-      const { data: updatedEntry, error: updateError } = await this.supabase
+      if (error) throw error;
+      dtrEntry = data;
+
+    } else if (entryCount === 1 && lastEntry.time_in && !lastEntry.time_out) {
+      // Action 2: Second scan - Clock-Out for Break
+      // Add a 1-hour restriction to prevent accidental double-scans
+      const timeInDate = new Date(lastEntry.time_in);
+      const timeDifferenceMs = nowPST.getTime() - timeInDate.getTime();
+      const oneHourInMs = 3600 * 1000;
+
+      if (timeDifferenceMs < oneHourInMs) {
+        throw new Error('Time out rejected, this is still not the time for your break time');
+      }
+
+      status = 'CLOCK_OUT_BREAK';
+      const { data, error } = await this.supabase
         .from('dtr_entries')
-        .update({ time_out: new Date().toISOString() })
+        .update({ time_out: nowPST.toISOString() })
         .eq('id', lastEntry.id)
         .select()
         .single();
-      if (updateError) throw updateError;
-      dtrEntry = updatedEntry;
+      if (error) throw error;
+      dtrEntry = data;
+
+    } else if (entryCount === 1 && lastEntry.time_in && lastEntry.time_out) {
+      // Action 3: Third scan - Clock-In from Break
+      status = 'CLOCK_IN_BREAK';
+       const { data, error } = await this.supabase
+        .from('dtr_entries')
+        .insert({ user_id: userId, time_in: nowPST.toISOString() })
+        .select()
+        .single();
+      if (error) throw error;
+      dtrEntry = data;
+
+    } else if (entryCount === 2 && lastEntry.time_in && !lastEntry.time_out) {
+      // Action 4: Fourth scan - Clock-Out for the Day
+      status = 'CLOCK_OUT_DAY';
+      const { data, error } = await this.supabase
+        .from('dtr_entries')
+        .update({ time_out: nowPST.toISOString() })
+        .eq('id', lastEntry.id)
+        .select()
+        .single();
+      if (error) throw error;
+      dtrEntry = data;
+    } else {
+      // All other cases are invalid (e.g., 5th scan)
+      throw new Error('You have already completed all your time entries for today.');
     }
 
-    return { profile, dtrEntry };
+    return { profile, dtrEntry, status };
   }
+
 
   getAllDtrEntries() {
     return this.supabase
@@ -532,6 +567,25 @@ export class SupabaseService {
       .in('user_id', userIds)
       .eq('date', date);
   }
+  
+  getStatusesForDateRange(userId: string, startDate: string, endDate: string) {
+    return this.supabase
+      .from('employee_status')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('date', startDate)
+      .lte('date', endDate);
+  }
+  
+  getAllStatusesForDateRange(userIds: string[], startDate: string, endDate: string) {
+    return this.supabase
+      .from('employee_status')
+      .select('*')
+      .in('user_id', userIds)
+      .gte('date', startDate)
+      .lte('date', endDate);
+  }
+
 
   getStatusesForCurrentUser() {
     const userId = this.currentUser()?.id;
@@ -545,25 +599,30 @@ export class SupabaseService {
       .order('date', { ascending: false });
   }
 
-  async setEmployeeStatus(
+  async requestLeaveAndUpdateBalance(
     userId: string,
-    status: EmployeeStatus['status'],
-    newBalances: Partial<Profile>
+    leaveRequests: { date: string; status: EmployeeStatus['status'] }[],
+    balanceUpdates: Partial<Profile>
   ) {
-    // 1. Insert the status log
+    // 1. Insert the status logs
     const { error: insertError } = await this.supabase
       .from('employee_status')
-      .insert({
-        user_id: userId,
-        status: status,
-        date: new Date().toISOString().slice(0, 10),
-      });
+      .insert(leaveRequests.map(req => ({ ...req, user_id: userId })));
+      
     if (insertError) throw insertError;
 
-    // 2. Update the profile with new balances
-    const { error: updateError } = await this.updateUserProfile(userId, newBalances);
-    if (updateError) throw updateError;
+    // 2. Update the profile with new balances if there are any
+    if (Object.keys(balanceUpdates).length > 0) {
+      const { error: updateError } = await this.updateUserProfile(userId, balanceUpdates);
+      if (updateError) {
+        // Attempt to roll back status insert - not truly atomic but better than nothing
+        const datesToDelete = leaveRequests.map(req => req.date);
+        await this.supabase.from('employee_status').delete().eq('user_id', userId).in('date', datesToDelete);
+        throw updateError;
+      }
+    }
   }
+
 
   // --- SALARY RULES ---
   getAllSalaryRules() {
