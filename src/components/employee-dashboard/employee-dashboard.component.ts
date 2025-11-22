@@ -149,7 +149,7 @@ export class EmployeeDashboardComponent {
     if (!hasUsedSILThisYear && profile.sil_balance !== 5) {
         const { error: updateError } = await this.supabaseService.updateUserProfile(profile.id, { sil_balance: 5 });
         if (updateError) {
-            console.error("Failed to grant SIL", updateError);
+            console.error("Failed to grant SIL:", updateError.message);
         } else {
             await this.supabaseService.loadUserProfile(profile.id); // Refresh profile state
         }
@@ -316,9 +316,13 @@ export class EmployeeDashboardComponent {
   }
 
   openEmergencyLeaveConfirmation(): void {
+    const new_message = this.dayOffBalance() > 0 
+        ? `This will use one of your ${this.dayOffBalance()} available Day Off balance(s).`
+        : `You have no Day Off balance remaining. This will be deducted from future leave credits.`;
+
     this.confirmModalConfig.set({
         title: 'Confirm Emergency Leave',
-        message: `Are you sure you want to take an emergency leave for today, ${new Date().toLocaleDateString()}? This will use one of your Day Off balances and cannot be undone.`,
+        message: `Are you sure you want to take an emergency leave for today, ${new Date().toLocaleDateString()}? ${new_message} This action cannot be undone.`,
         onConfirm: () => this.submitLeaveRequest('emergency_leave', [new Date().toISOString().slice(0, 10)])
     });
     this.isConfirmModalVisible.set(true);

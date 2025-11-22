@@ -48,15 +48,6 @@
                   <p class="text-sm font-mono text-gray-500 dark:text-gray-400 mt-1">{{ emp.employee_id }}</p>
                 }
               </div>
-
-              <!-- Divider -->
-              <div class="w-full border-t border-gray-200 dark:border-gray-600"></div>
-
-              <!-- Schedule Info -->
-              <div class="text-center">
-                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Today's Schedule</p>
-                <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{{ currentSchedule() }}</p>
-              </div>
               
               <div class="cursor-pointer p-1 bg-white border dark:border-gray-600 rounded-md shadow-sm" (click)="isQrEnlarged.set(true)" title="Click to enlarge QR code">
                 <canvas #smallQrCanvas></canvas>

@@ -75,6 +75,7 @@ export interface Payroll {
   net_pay: number;
   created_at: string;
   status: 'Paid' | 'Delayed' | 'Unpaid';
+  raise_details?: { name: string; amount: number }[] | null;
 }
 
 export interface SalaryRule {
@@ -128,7 +129,8 @@ ALTER TABLE public.payrolls
   ADD COLUMN IF NOT EXISTS lateness_minutes INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS undertime_minutes INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS lateness_deductions NUMERIC NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS undertime_deductions NUMERIC NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS undertime_deductions NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS raise_details JSONB;
 
 -- Step 4: Create essential database functions.
 
@@ -376,7 +378,7 @@ export class SupabaseService {
       if (sessionError) {
         // This is a critical state. Admin is logged out and session couldn't be restored.
         // Forcing a redirect to login is the safest recovery action.
-        console.error('FATAL: Could not restore admin session after user creation attempt.', sessionError);
+        console.error('FATAL: Could not restore admin session after user creation attempt.', sessionError.message);
         this.router.navigate(['/login']);
       }
     }
@@ -386,22 +388,32 @@ export class SupabaseService {
   // --- DTR (Daily Time Record) ---
 
   /**
-   * Returns the start and end of the current day in Philippine Standard Time (UTC+8).
+   * Returns robust, timezone-aware date/time information for the current moment in PST.
    */
-  private getTodayPSTBounds(): { startOfDay: Date; endOfDay: Date } {
+  private getTodayPSTBounds(): { startOfDay: string; endOfDay: string; nowPST: Date } {
+    const timeZone = 'Asia/Manila';
     const now = new Date();
-    const localTime = now.getTime();
-    const localOffset = now.getTimezoneOffset() * 60000;
-    const utc = localTime + localOffset;
-    const phTime = new Date(utc + 3600000 * 8); // UTC+8
+    // Create a Date object that accurately reflects the current time in the Philippines.
+    const nowPST = new Date(now.toLocaleString('en-US', { timeZone }));
 
-    const startOfDay = new Date(phTime);
-    startOfDay.setHours(0, 0, 0, 0);
+    // Use Intl.DateTimeFormat to reliably get date components for the target timezone.
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(now);
 
-    const endOfDay = new Date(phTime);
-    endOfDay.setHours(23, 59, 59, 999);
+    const year = parts.find(p => p.type === 'year')!.value;
+    const month = parts.find(p => p.type === 'month')!.value;
+    const day = parts.find(p => p.type === 'day')!.value;
+    const todayPstStr = `${year}-${month}-${day}`;
+    
+    // Construct ISO-8601 strings with timezone offset for accurate database queries.
+    const startOfDay = `${todayPstStr}T00:00:00.000+08:00`;
+    const endOfDay = `${todayPstStr}T23:59:59.999+08:00`;
 
-    return { startOfDay, endOfDay };
+    return { startOfDay, endOfDay, nowPST };
   }
 
   async handleQrCodeLogin(userId: string) {
@@ -414,17 +426,26 @@ export class SupabaseService {
     if (profileError) throw profileError;
     if (!profile) throw new Error('User not found.');
     
-    // 2. Determine current time in PST for all operations
-    const { startOfDay, endOfDay } = this.getTodayPSTBounds();
-    const nowPST = new Date(new Date().getTime() + (new Date().getTimezoneOffset() * 60000) + (3600000 * 8));
+    // 2. Determine current time in PST for all operations using the robust method.
+    const { startOfDay, endOfDay, nowPST } = this.getTodayPSTBounds();
+
+    // Fetch schedule for today to enforce it.
+    const todayStr = nowPST.toISOString().slice(0, 10);
+    const { data: schedule, error: scheduleError } = await this.supabase
+      .from('employee_schedules')
+      .select('id') // We only need to know if a schedule exists
+      .eq('user_id', userId)
+      .eq('date', todayStr)
+      .maybeSingle();
+    if (scheduleError) throw scheduleError;
 
     // 3. Fetch all DTR entries for today (in PST)
     const { data: todaysEntries, error: dtrError } = await this.supabase
       .from('dtr_entries')
       .select('*')
       .eq('user_id', userId)
-      .gte('created_at', startOfDay.toISOString())
-      .lte('created_at', endOfDay.toISOString())
+      .gte('created_at', startOfDay)
+      .lte('created_at', endOfDay)
       .order('created_at', { ascending: true });
 
     if (dtrError) throw dtrError;
@@ -434,13 +455,18 @@ export class SupabaseService {
     
     let dtrEntry: DtrEntry;
     let status: string;
+    const nowIsoString = nowPST.toISOString();
 
     if (entryCount === 0) {
+      // Enforce schedule for the first clock-in of the day.
+      if (!schedule) {
+        throw new Error('Clock-in rejected: You are not scheduled to work today.');
+      }
       // Action 1: First scan of the day - Clock-In for Work
       status = 'CLOCK_IN_WORK';
       const { data, error } = await this.supabase
         .from('dtr_entries')
-        .insert({ user_id: userId, time_in: nowPST.toISOString() })
+        .insert({ user_id: userId, time_in: nowIsoString })
         .select()
         .single();
       if (error) throw error;
@@ -460,7 +486,7 @@ export class SupabaseService {
       status = 'CLOCK_OUT_BREAK';
       const { data, error } = await this.supabase
         .from('dtr_entries')
-        .update({ time_out: nowPST.toISOString() })
+        .update({ time_out: nowIsoString })
         .eq('id', lastEntry.id)
         .select()
         .single();
@@ -472,7 +498,7 @@ export class SupabaseService {
       status = 'CLOCK_IN_BREAK';
        const { data, error } = await this.supabase
         .from('dtr_entries')
-        .insert({ user_id: userId, time_in: nowPST.toISOString() })
+        .insert({ user_id: userId, time_in: nowIsoString })
         .select()
         .single();
       if (error) throw error;
@@ -483,14 +509,25 @@ export class SupabaseService {
       status = 'CLOCK_OUT_DAY';
       const { data, error } = await this.supabase
         .from('dtr_entries')
-        .update({ time_out: nowPST.toISOString() })
+        .update({ time_out: nowIsoString })
         .eq('id', lastEntry.id)
         .select()
         .single();
       if (error) throw error;
       dtrEntry = data;
     } else {
-      // All other cases are invalid (e.g., 5th scan)
+      // All other cases are invalid (e.g., 5th scan after clocking out for the day)
+      // Add a 3-hour lockout period to prevent accidental scans long after a shift ends.
+      if (entryCount === 2 && lastEntry.time_out) {
+        const timeOutDate = new Date(lastEntry.time_out);
+        const timeDifferenceMs = nowPST.getTime() - timeOutDate.getTime();
+        const threeHoursInMs = 3 * 3600 * 1000;
+
+        if (timeDifferenceMs > threeHoursInMs) {
+          throw new Error('Clock-in rejected. It has been more than 3 hours since you clocked out.');
+        }
+      }
+      
       throw new Error('You have already completed all your time entries for today.');
     }
 
@@ -527,6 +564,7 @@ export class SupabaseService {
     return this.supabase
       .from('dtr_entries')
       .select('*')
+      .not('time_in', 'is', null) // Defensively filter out entries without a time_in
       .gte('time_in', startDate)
       .lte('time_in', endDate);
   }
@@ -555,6 +593,16 @@ export class SupabaseService {
     return this.supabase
       .from('employee_schedules')
       .upsert(schedules, { onConflict: 'user_id, date' });
+  }
+
+  deleteSchedules(schedules: { userId: string; date: string }[]) {
+    if (schedules.length === 0) {
+      return Promise.resolve([]);
+    }
+    const deletePromises = schedules.map(s =>
+      this.supabase.from('employee_schedules').delete().match({ user_id: s.userId, date: s.date })
+    );
+    return Promise.all(deletePromises);
   }
 
   // --- EMPLOYEE STATUS & LEAVE ---
@@ -685,6 +733,7 @@ export class SupabaseService {
     return this.supabase.channel('public-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, callback)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'dtr_entries' }, callback)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_schedules' }, callback)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_status' }, callback)
       .subscribe();
   }

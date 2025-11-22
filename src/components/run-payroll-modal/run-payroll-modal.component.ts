@@ -13,6 +13,7 @@ interface PayrollPreview {
   baseGrossPay: number;
   salaryRaise: number;
   birthMonthBonus: number;
+  raiseDetails: { name: string; amount: number }[];
   totalGrossPay: number;
   totalMinutesLate: number;
   totalMinutesUnderTime: number;
@@ -134,6 +135,7 @@ export class RunPayrollModalComponent {
         let totalMinutesUnderTime = 0;
         let baseGrossPay = 0;
         let salaryRaise = 0;
+        const raiseDetails: { name: string; amount: number }[] = [];
 
         // Iterate through each day of the pay period
         for (let day = new Date(payrollStartDate); day <= payrollEndDate; day.setDate(day.getDate() + 1)) {
@@ -148,43 +150,68 @@ export class RunPayrollModalComponent {
 
             if (!schedule) continue; // Not a scheduled workday
 
-            const dailyEntries = dtrByDay[dateKey];
-            if (!dailyEntries || dailyEntries.length === 0) continue; // Absent
+            const dailyEntries = dtrByDay[dateKey] || [];
+            if (dailyEntries.length === 0) continue; // Absent
 
             daysWorkedInPeriod++;
-
             dailyEntries.sort((a, b) => new Date(a.time_in!).getTime() - new Date(b.time_in!).getTime());
             
             let dailyWorkDurationMs = 0;
-            dailyEntries.forEach(dtr => {
-              if (dtr.time_in && dtr.time_out) {
-                dailyWorkDurationMs += new Date(dtr.time_out).getTime() - new Date(dtr.time_in).getTime();
-              }
-            });
+            // First work period
+            if (dailyEntries[0]?.time_in && dailyEntries[0]?.time_out) {
+                dailyWorkDurationMs += new Date(dailyEntries[0].time_out).getTime() - new Date(dailyEntries[0].time_in).getTime();
+            }
+
+            // Second work period (after break)
+            if (dailyEntries[1]?.time_in) {
+                const timeIn2 = new Date(dailyEntries[1].time_in);
+                let timeOut2: Date | null = null;
+                
+                if (dailyEntries[1].time_out) {
+                    // Manual clock-out exists
+                    timeOut2 = new Date(dailyEntries[1].time_out);
+                } else {
+                    // Auto clock-out: use scheduled end time, as overtime is not paid
+                    timeOut2 = new Date(`${dateKey}T${schedule.work_end_time}+08:00`);
+                }
+
+                if (timeOut2) {
+                    dailyWorkDurationMs += Math.max(0, timeOut2.getTime() - timeIn2.getTime());
+                }
+            }
+
             const dailyWorkDurationHours = dailyWorkDurationMs / (1000 * 60 * 60);
             totalHoursInPeriod += dailyWorkDurationHours;
 
+            const expectedStart = new Date(`${dateKey}T${schedule.work_start_time}+08:00`);
+            const expectedEnd = new Date(`${dateKey}T${schedule.work_end_time}+08:00`);
+
             const timeIn = new Date(dailyEntries[0].time_in!);
-            const expectedStart = new Date(`${dateKey}T${schedule.work_start_time}Z`);
             const minutesLate = (timeIn.getTime() - expectedStart.getTime()) / (1000 * 60);
             if (minutesLate > GRACE_PERIOD_MINUTES) {
                 totalMinutesLate += Math.round(minutesLate);
             }
 
-            const scheduleStart = new Date(`${dateKey}T${schedule.work_start_time}Z`);
-            const scheduleEnd = new Date(`${dateKey}T${schedule.work_end_time}Z`);
-            const requiredWorkMs = scheduleEnd.getTime() - scheduleStart.getTime();
-            const requiredWorkHours = (requiredWorkMs / (1000*60*60)) - 1; // Assume 1-hour break
-            
+            const requiredWorkHours = (expectedEnd.getTime() - expectedStart.getTime() - (3600 * 1000)) / (1000*60*60); // Assume 1-hour break
+
             if (dailyWorkDurationHours < requiredWorkHours) {
-              totalMinutesUnderTime += Math.round((requiredWorkHours - dailyWorkDurationHours) * 60);
+                 const undertimeHours = Math.max(0, requiredWorkHours - dailyWorkDurationHours);
+                 totalMinutesUnderTime += Math.round(undertimeHours * 60);
             }
 
             for (const rule of activeSalaryRules) {
               const ruleStart = new Date(rule.start_date);
               const ruleEnd = new Date(rule.end_date);
               if (day >= ruleStart && day <= ruleEnd) {
-                salaryRaise += emp.daily_rate * (rule.raise_percentage / 100);
+                const raiseAmount = emp.daily_rate * (rule.raise_percentage / 100);
+                salaryRaise += raiseAmount;
+
+                const existingRaise = raiseDetails.find(r => r.name === rule.name);
+                if (existingRaise) {
+                    existingRaise.amount += raiseAmount;
+                } else {
+                    raiseDetails.push({ name: rule.name, amount: raiseAmount });
+                }
               }
             }
         }
@@ -198,18 +225,15 @@ export class RunPayrollModalComponent {
 
         let birthMonthBonus = 0;
         if (emp.birth_date && emp.position) {
-            // Get the birth month (0-11) from the employee's profile.
-            // This avoids timezone issues from `new Date()`.
             const birthMonth = parseInt(emp.birth_date.split('-')[1], 10) - 1;
-
-            // Get the months covered by the pay period.
             const payPeriodStartMonth = payrollStartDate.getUTCMonth();
             const payPeriodEndMonth = payrollEndDate.getUTCMonth();
 
-            // Grant the bonus if the employee's birth month is one of the months
-            // covered by the current pay period.
             if (birthMonth === payPeriodStartMonth || birthMonth === payPeriodEndMonth) {
                 birthMonthBonus = BIRTH_MONTH_BONUS[emp.position as keyof typeof BIRTH_MONTH_BONUS] || 0;
+                if (birthMonthBonus > 0) {
+                    raiseDetails.push({ name: 'Birth Month Bonus', amount: birthMonthBonus });
+                }
             }
         }
 
@@ -226,6 +250,7 @@ export class RunPayrollModalComponent {
           baseGrossPay: parseFloat(baseGrossPay.toFixed(2)),
           salaryRaise: parseFloat(salaryRaise.toFixed(2)),
           birthMonthBonus: parseFloat(birthMonthBonus.toFixed(2)),
+          raiseDetails: raiseDetails.map(r => ({ ...r, amount: parseFloat(r.amount.toFixed(2)) })),
           totalGrossPay: parseFloat(totalGrossPay.toFixed(2)),
           totalMinutesLate,
           totalMinutesUnderTime,
@@ -303,7 +328,8 @@ export class RunPayrollModalComponent {
           lateness_deductions: p.latenessDeductions,
           undertime_deductions: p.underTimeDeductions,
           manual_deductions: p.manualDeductions,
-          net_pay: p.netPay
+          net_pay: p.netPay,
+          raise_details: p.raiseDetails,
         };
         
         // --- FIX for recurring "early_departure_minutes" database error ---

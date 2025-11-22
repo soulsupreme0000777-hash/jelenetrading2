@@ -40,8 +40,9 @@ export class SetScheduleModalComponent {
   modalState = signal<ModalState>('loading');
   errorMessage = signal<string | null>(null);
 
-  // Date & Calendar State
-  currentDate = signal(new Date());
+  // This signal tracks the month/year being viewed, anchored to PST.
+  // 'en-US' is a safe locale for parsing the date string.
+  currentDate = signal(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })));
   calendarDays = signal<CalendarDay[]>([]);
   readonly weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   readonly scheduleTemplates = Object.keys(SCHEDULE_TEMPLATES) as ScheduleTemplateKey[];
@@ -52,6 +53,7 @@ export class SetScheduleModalComponent {
 
   // Data State
   schedules = signal<Map<string, ScheduleTemplateKey>>(new Map()); // Key: 'userId|dateStr'
+  initialSchedules = signal<Map<string, ScheduleTemplateKey>>(new Map());
 
   isAllSelected = computed(() => {
     const employees = this.employees();
@@ -61,6 +63,8 @@ export class SetScheduleModalComponent {
   constructor() {
     effect(() => {
       if (this.visible()) {
+        // Reset to current PST month when modal opens for consistency
+        this.currentDate.set(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })));
         this.generateCalendar();
         this.loadSchedulesForMonth();
       } else {
@@ -70,32 +74,56 @@ export class SetScheduleModalComponent {
   }
   
   generateCalendar(): void {
-    const date = this.currentDate();
-    const year = date.getFullYear();
-    const month = date.getMonth();
+    const viewingDate = this.currentDate();
+    const year = viewingDate.getFullYear();
+    const month = viewingDate.getMonth();
 
-    const firstDayOfMonth = new Date(year, month, 1);
-    const lastDayOfMonth = new Date(year, month + 1, 0);
+    // Use LOCAL date parts from our PST-based date to construct UTC dates.
+    // This prevents the user's local timezone from interfering with calendar generation.
+    const firstDayOfMonth = new Date(Date.UTC(year, month, 1));
+    const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0));
     
+    const startDayOfWeek = firstDayOfMonth.getUTCDay();
     const startDate = new Date(firstDayOfMonth);
-    startDate.setDate(startDate.getDate() - firstDayOfMonth.getDay());
+    startDate.setUTCDate(startDate.getUTCDate() - startDayOfWeek);
     
+    const endDayOfWeek = lastDayOfMonth.getUTCDay();
     const endDate = new Date(lastDayOfMonth);
-    endDate.setDate(endDate.getDate() + (6 - lastDayOfMonth.getDay()));
+    endDate.setUTCDate(endDate.getUTCDate() + (6 - endDayOfWeek));
 
     const days: CalendarDay[] = [];
     let dayIterator = new Date(startDate);
+    
+    // --- DEFINITIVE FIX: Use Intl.DateTimeFormat for robust, standards-based timezone handling. ---
+    const timeZone = 'Asia/Manila';
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(new Date());
+
+    const yearToday = parts.find(p => p.type === 'year')!.value;
+    const monthToday = parts.find(p => p.type === 'month')!.value;
+    const dayToday = parts.find(p => p.type === 'day')!.value;
+    const todayPstStr = `${yearToday}-${monthToday}-${dayToday}`;
+
+
     while (dayIterator <= endDate) {
-      const dayOfWeek = dayIterator.getDay();
+      // The iterator is built from UTC components, so its ISO string's date part
+      // correctly represents the date in our target timezone (PST).
+      const dateStr = dayIterator.toISOString().slice(0, 10);
+      const dayOfWeek = dayIterator.getUTCDay();
+      
       days.push({
         date: new Date(dayIterator),
-        dateStr: dayIterator.toISOString().slice(0, 10),
-        dayOfMonth: dayIterator.getDate(),
-        isCurrentMonth: dayIterator.getMonth() === month,
-        isToday: dayIterator.toDateString() === new Date().toDateString(),
+        dateStr: dateStr,
+        dayOfMonth: dayIterator.getUTCDate(),
+        isCurrentMonth: dayIterator.getUTCMonth() === month,
+        isToday: dateStr === todayPstStr,
         isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
       });
-      dayIterator.setDate(dayIterator.getDate() + 1);
+      dayIterator.setUTCDate(dayIterator.getUTCDate() + 1);
     }
     this.calendarDays.set(days);
   }
@@ -130,6 +158,7 @@ export class SetScheduleModalComponent {
         }
       });
       this.schedules.set(scheduleMap);
+      this.initialSchedules.set(new Map(scheduleMap));
       this.modalState.set('loaded');
     } catch (e: any) {
       this.errorMessage.set('Failed to load existing schedules.');
@@ -201,8 +230,11 @@ export class SetScheduleModalComponent {
 
   async saveSchedules(): Promise<void> {
     this.modalState.set('loading');
-    const schedulesToUpsert: Omit<EmployeeSchedule, 'id' | 'created_at'>[] = [];
     
+    const schedulesToUpsert: Omit<EmployeeSchedule, 'id' | 'created_at'>[] = [];
+    const finalScheduleKeys = new Set<string>();
+
+    // Prepare all current schedules for upsert
     this.schedules().forEach((templateKey, key) => {
       const [user_id, date] = key.split('|');
       const template = SCHEDULE_TEMPLATES[templateKey];
@@ -212,26 +244,52 @@ export class SetScheduleModalComponent {
         work_start_time: template.work_start_time,
         work_end_time: template.work_end_time,
       });
+      finalScheduleKeys.add(key);
+    });
+
+    // Determine which schedules to delete by comparing the initial state to the final state
+    const schedulesToDelete: { userId: string; date: string }[] = [];
+    this.initialSchedules().forEach((_, key) => {
+      if (!finalScheduleKeys.has(key)) {
+        // This key was in the initial map but not the final one, so it was cleared.
+        const [userId, date] = key.split('|');
+        schedulesToDelete.push({ userId, date });
+      }
     });
 
     try {
-      const { error } = await this.supabaseService.upsertSchedules(schedulesToUpsert);
-      if (error) throw error;
+      const upsertPromise = this.supabaseService.upsertSchedules(schedulesToUpsert);
+      const deletePromise = this.supabaseService.deleteSchedules(schedulesToDelete);
+
+      const [upsertResult, deleteResults] = await Promise.all([upsertPromise, deletePromise]);
+
+      if (upsertResult.error) throw upsertResult.error;
+      const deleteError = (deleteResults as any[]).find(res => res.error);
+      if (deleteError) throw deleteError.error;
+
       this.closeModal();
     } catch (e: any) {
-      this.errorMessage.set('Failed to save schedules.');
+      this.errorMessage.set(`Failed to save schedules: ${e.message}`);
       this.modalState.set('loaded');
     }
   }
 
   previousMonth(): void {
-    this.currentDate.update(d => new Date(d.getFullYear(), d.getMonth() - 1, 15));
+    this.currentDate.update(d => {
+      const newDate = new Date(d);
+      newDate.setMonth(newDate.getMonth() - 1);
+      return newDate;
+    });
     this.generateCalendar();
     this.loadSchedulesForMonth();
   }
 
   nextMonth(): void {
-    this.currentDate.update(d => new Date(d.getFullYear(), d.getMonth() + 1, 15));
+    this.currentDate.update(d => {
+      const newDate = new Date(d);
+      newDate.setMonth(newDate.getMonth() + 1);
+      return newDate;
+    });
     this.generateCalendar();
     this.loadSchedulesForMonth();
   }
@@ -242,9 +300,10 @@ export class SetScheduleModalComponent {
 
   private resetState(): void {
     this.modalState.set('loading');
-    this.currentDate.set(new Date());
+    this.currentDate.set(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })));
     this.selectedEmployeeIds.set(new Set());
     this.schedules.set(new Map());
+    this.initialSchedules.set(new Map());
     this.errorMessage.set(null);
   }
 }

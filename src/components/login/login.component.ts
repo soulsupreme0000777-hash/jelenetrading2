@@ -26,7 +26,11 @@ export class LoginComponent {
   private readonly router: Router = inject(Router);
 
   constructor() {
-    // Redirect if user is already logged in
+    // This effect handles two scenarios:
+    // 1. If the user is already logged in (e.g., has a valid session in localStorage),
+    //    it redirects them from the login page to the dashboard automatically.
+    // 2. After a successful sign-in, the supabaseService updates the currentUser signal,
+    //    which triggers this effect to navigate to the dashboard.
     effect(() => {
       if (this.supabaseService.isInitialized() && this.supabaseService.currentUser()) {
         untracked(() => {
@@ -35,7 +39,7 @@ export class LoginComponent {
       }
     });
 
-    // Disable form when loading
+    // Disable form when loading to prevent multiple submissions
     effect(() => {
       const isLoading = this.loading();
       if (isLoading) {
@@ -46,7 +50,7 @@ export class LoginComponent {
     });
   }
 
-  // Helper getters for template
+  // Helper getters for template to simplify access
   get email() { return this.loginForm.get('email'); }
   get password() { return this.loginForm.get('password'); }
 
@@ -56,7 +60,7 @@ export class LoginComponent {
 
   async onSubmit(): Promise<void> {
     if (this.loginForm.invalid) {
-      this.loginForm.markAllAsTouched();
+      this.loginForm.markAllAsTouched(); // Show validation errors
       return;
     }
 
@@ -68,10 +72,18 @@ export class LoginComponent {
         email: email!,
         password: password!,
       });
-      if (error) throw error;
-      // Effect handles redirection
+      if (error) {
+        // Throw the error to be caught by the catch block
+        throw error;
+      }
+      // On success, the effect in the constructor will handle the redirection.
     } catch (error: any) {
-      this.errorMessage.set(error.message || 'An unexpected error occurred.');
+      // Set a user-friendly error message
+      if (error.message === 'Invalid login credentials') {
+          this.errorMessage.set('Incorrect email or password. Please try again.');
+      } else {
+          this.errorMessage.set(error.message || 'An unexpected error occurred during login.');
+      }
     } finally {
       this.loading.set(false);
     }

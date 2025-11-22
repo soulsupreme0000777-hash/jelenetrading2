@@ -447,10 +447,23 @@ export class AdminDashboardComponent implements OnDestroy {
     this.analyticsError.set(null);
 
     try {
-        const today = new Date();
-        const todayStr = today.toISOString().slice(0, 10);
-        const startOfDay = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
-        const endOfDay = new Date(new Date().setHours(23, 59, 59, 999)).toISOString();
+        const timeZone = 'Asia/Manila';
+        const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone }));
+
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).formatToParts(nowPST);
+
+        const year = parts.find(p => p.type === 'year')!.value;
+        const month = parts.find(p => p.type === 'month')!.value;
+        const day = parts.find(p => p.type === 'day')!.value;
+        const todayStr = `${year}-${month}-${day}`;
+
+        const startOfDayPSTIso = `${todayStr}T00:00:00.000+08:00`;
+        const endOfDayPSTIso = `${todayStr}T23:59:59.999+08:00`;
 
         const employeesRes = await this.supabaseService.getAllUsersWithProfiles();
         if (employeesRes.error) throw employeesRes.error;
@@ -463,7 +476,7 @@ export class AdminDashboardComponent implements OnDestroy {
 
         const employeeIds = employees.map(e => e.id);
         const [dtrRes, schedulesRes, statusesRes] = await Promise.all([
-            this.supabaseService.getDtrEntriesForDateRange(startOfDay, endOfDay),
+            this.supabaseService.getDtrEntriesForDateRange(startOfDayPSTIso, endOfDayPSTIso),
             this.supabaseService.getSchedulesForDateRange(employeeIds, todayStr, todayStr),
             this.supabaseService.getStatusesForDate(employeeIds, todayStr)
         ]);
@@ -489,7 +502,6 @@ export class AdminDashboardComponent implements OnDestroy {
         const statusMap = new Map<string, EmployeeStatus>();
         statusesToday.forEach(s => statusMap.set(s.user_id, s));
 
-        const now = Date.now();
         const statuses = employees.map((emp): LiveEmployeeStatus => {
             const todaysEntries = dtrMap.get(emp.id) || [];
             const schedule = scheduleMap.get(emp.id);
@@ -514,40 +526,52 @@ export class AdminDashboardComponent implements OnDestroy {
                  const endTime = this.formatTimeForDisplay(schedule.work_end_time);
                  todaysSchedule = `${startTime} - ${endTime}`;
                  
-                 if (todaysEntries.length === 0) {
-                    status = 'Absent';
-                 } else if (todaysEntries.length === 1 && todaysEntries[0].time_in) {
-                    status = 'Timed In';
-                    lastEventTime = new Date(todaysEntries[0].time_in);
-                    workDurationSeconds = (now - lastEventTime.getTime()) / 1000;
-                } else if (todaysEntries.length === 1 && todaysEntries[0].time_out) { // Break start
-                    status = 'On Break';
-                    const timeIn1 = new Date(todaysEntries[0].time_in!);
-                    const timeOut1 = new Date(todaysEntries[0].time_out!);
-                    lastEventTime = timeOut1;
-                    workDurationSeconds = (timeOut1.getTime() - timeIn1.getTime()) / 1000;
-                    const elapsedBreak = (now - timeOut1.getTime()) / 1000;
-                    breakTimeRemainingSeconds = 3600 - elapsedBreak;
-                 } else if (todaysEntries.length === 2 && todaysEntries[1].time_in) { // Break end
-                    status = 'Timed In';
-                    const timeIn1 = new Date(todaysEntries[0].time_in!);
-                    const timeOut1 = new Date(todaysEntries[0].time_out!);
-                    const timeIn2 = new Date(todaysEntries[1].time_in!);
-                    lastEventTime = timeIn2;
-                    const firstPeriod = (timeOut1.getTime() - timeIn1.getTime()) / 1000;
-                    const secondPeriod = (now - timeIn2.getTime()) / 1000;
-                    workDurationSeconds = firstPeriod + secondPeriod;
-                } else if (todaysEntries.length >= 2 && todaysEntries[1].time_out) { // Day end
-                    status = 'Timed Out';
-                    const timeIn1 = new Date(todaysEntries[0].time_in!);
-                    const timeOut1 = new Date(todaysEntries[0].time_out!);
-                    const timeIn2 = new Date(todaysEntries[1].time_in!);
-                    const timeOut2 = new Date(todaysEntries[1].time_out!);
-                    lastEventTime = timeOut2;
-                    workDurationSeconds = ((timeOut1.getTime() - timeIn1.getTime()) + (timeOut2.getTime() - timeIn2.getTime())) / 1000;
-                } else {
-                    status = 'Absent'; // Fallback
-                }
+                 const entryCount = todaysEntries.length;
+                 const timeIn1 = entryCount > 0 ? new Date(todaysEntries[0].time_in!) : null;
+                 const timeOut1 = (entryCount > 0 && todaysEntries[0].time_out) ? new Date(todaysEntries[0].time_out) : null;
+                 const timeIn2 = (entryCount > 1 && todaysEntries[1].time_in) ? new Date(todaysEntries[1].time_in) : null;
+                 const timeOut2 = (entryCount > 1 && todaysEntries[1].time_out) ? new Date(todaysEntries[1].time_out) : null;
+                 
+                 let firstPeriodSeconds = 0;
+                 if (timeIn1 && timeOut1) {
+                     firstPeriodSeconds = (timeOut1.getTime() - timeIn1.getTime()) / 1000;
+                 }
+
+                 if (entryCount === 0) {
+                     status = 'Absent';
+                 } else if (timeIn1 && !timeOut1) { // Clocked-in, before break
+                     status = 'Timed In';
+                     lastEventTime = timeIn1;
+                     workDurationSeconds = (nowPST.getTime() - timeIn1.getTime()) / 1000;
+                 } else if (timeOut1 && !timeIn2) { // On break
+                     status = 'On Break';
+                     lastEventTime = timeOut1;
+                     workDurationSeconds = firstPeriodSeconds;
+                     const elapsedBreak = (nowPST.getTime() - timeOut1.getTime()) / 1000;
+                     breakTimeRemainingSeconds = 3600 - elapsedBreak;
+                 } else if (timeIn2 && !timeOut2) { // Clocked-in, after break
+                     const scheduledEndDateTime = new Date(`${todayStr}T${schedule.work_end_time}`);
+                     const autoClockOutDateTime = new Date(scheduledEndDateTime.getTime() + (60 * 60 * 1000));
+
+                     if (nowPST.getTime() > autoClockOutDateTime.getTime()) {
+                         status = 'Timed Out';
+                         lastEventTime = scheduledEndDateTime;
+                         const secondPeriodSeconds = (scheduledEndDateTime.getTime() - timeIn2.getTime()) / 1000;
+                         workDurationSeconds = firstPeriodSeconds + Math.max(0, secondPeriodSeconds);
+                     } else {
+                         status = 'Timed In';
+                         lastEventTime = timeIn2;
+                         const secondPeriodSeconds = (nowPST.getTime() - timeIn2.getTime()) / 1000;
+                         workDurationSeconds = firstPeriodSeconds + secondPeriodSeconds;
+                     }
+                 } else if (timeOut2) { // Clocked out for the day
+                     status = 'Timed Out';
+                     lastEventTime = timeOut2;
+                     const secondPeriodSeconds = (timeOut2.getTime() - timeIn2!.getTime()) / 1000;
+                     workDurationSeconds = firstPeriodSeconds + secondPeriodSeconds;
+                 } else {
+                     status = 'Absent'; // Fallback for incomplete data
+                 }
             } else {
                  status = 'No Schedule';
                  todaysSchedule = 'No Schedule';
@@ -785,7 +809,7 @@ export class AdminDashboardComponent implements OnDestroy {
         requestAnimationFrame(this.tick.bind(this));
 
     } catch (err: any) {
-        console.error('Error starting scanner:', err);
+        console.error('Error starting scanner:', err.message || err);
         this.scannerErrorMessage.set(err.message || 'Could not access the camera. Check permissions.');
     }
   }

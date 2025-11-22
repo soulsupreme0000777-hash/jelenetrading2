@@ -49,7 +49,7 @@
   </div>
 
   <!-- Main Content -->
-  <main class="flex-1 p-6 sm:p-8 lg:p-10 overflow-y-auto bg-gray-50 dark:bg-gray-900 relative">
+  <main class="flex-1 p-4 sm:p-8 lg:p-10 overflow-y-auto bg-gray-50 dark:bg-gray-900 relative">
     <!-- Notification -->
     @if(notification(); as notif) {
       <div 
@@ -97,7 +97,7 @@
                     <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Employee Management</h1>
                     <p class="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block">View, add, and manage all employees.</p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                     <button (click)="toggleTimeClockMode()" class="flex items-center gap-2 px-3 sm:px-4 py-2 bg-teal-600 text-white rounded-lg shadow-md hover:bg-teal-700 transition-colors">
                         <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75ZM6.75 16.5h.75v.75h-.75v-.75ZM16.5 6.75h.75v.75h-.75v-.75ZM13.5 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 16.5h.75v.75h-.75v-.75Z" /></svg>
                         <span class="hidden sm:inline">Time Clock</span>
@@ -174,8 +174,8 @@
           @else if(employeesError()) { <p class="text-red-500 text-center p-8">{{ employeesError() }}</p> }
           @else {
             <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700/50">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 md:table">
+                <thead class="bg-gray-50 dark:bg-gray-700/50 hidden md:table-header-group">
                   <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Employee ID</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Full Name</th>
@@ -186,13 +186,26 @@
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   @for(employee of filteredEmployees(); track employee.id) {
-                    <tr>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600 dark:text-gray-400">{{ employee.employee_id }}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ employee.first_name }} {{ employee.last_name }}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 capitalize">{{ employee.branch }}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 capitalize">{{ employee.position }}</td>
-                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div class="flex items-center gap-1">
+                    <tr class="block md:table-row">
+                      <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                          <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">ID: </span>
+                          <span class="font-mono text-gray-600 dark:text-gray-400">{{ employee.employee_id }}</span>
+                      </td>
+                      <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                          <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Name: </span>
+                          <span class="text-gray-900 dark:text-white">{{ employee.first_name }} {{ employee.last_name }}</span>
+                      </td>
+                      <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm capitalize md:table-cell block">
+                          <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Branch: </span>
+                          <span class="text-gray-500 dark:text-gray-400">{{ employee.branch }}</span>
+                      </td>
+                      <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm capitalize md:table-cell block">
+                          <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Position: </span>
+                          <span class="text-gray-500 dark:text-gray-400">{{ employee.position }}</span>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium md:table-cell block">
+                         <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden mb-2 block">Actions</span>
+                        <div class="flex items-center gap-1 -ml-2 md:ml-0">
                           <button (click)="openIdCardModal(employee)" class="p-2 rounded-full text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" title="Show ID Card">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2h-8zM2 4a2 2 0 012-2h2v16H4a2 2 0 01-2-2V4zm10 2a1 1 0 011-1h2a1 1 0 110 2h-2a1 1 0 01-1-1zm-5 0a1 1 0 011-1h2a1 1 0 110 2H8a1 1 0 01-1-1zm-1 4a1 1 0 100 2h6a1 1 0 100-2H6z" clip-rule="evenodd" /></svg>
                           </button>
@@ -263,9 +276,9 @@
             @for(group of groupedDtrPayPeriods(); track group.id) {
               <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
                 <button (click)="toggleDtrPeriod(group.id)" class="w-full flex justify-between items-center p-4 text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                  <div class="flex-1 flex items-center gap-4">
+                  <div class="flex-1 flex flex-col sm:flex-row sm:items-center sm:gap-4">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">{{ group.display }}</h3>
-                    <span class="px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full"
+                    <span class="px-2.5 py-0.5 mt-1 sm:mt-0 inline-flex text-xs leading-5 font-semibold rounded-full self-start"
                           [class.bg-green-100]="group.payrollStatus === 'Processed'" [class.text-green-800]="group.payrollStatus === 'Processed'"
                           [class.dark:bg-green-900/50]="group.payrollStatus === 'Processed'" [class.dark:text-green-300]="group.payrollStatus === 'Processed'"
                           [class.bg-yellow-100]="group.payrollStatus === 'Not Processed'" [class.text-yellow-800]="group.payrollStatus === 'Not Processed'"
@@ -273,7 +286,7 @@
                       {{ group.payrollStatus === 'Processed' ? 'Payroll Processed' : 'Not Processed' }}
                     </span>
                   </div>
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-2 flex-shrink-0">
                     @if (group.payrollStatus === 'Not Processed') {
                       <button (click)="openRunPayrollForPeriod(group); $event.stopPropagation()" class="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md shadow-sm hover:bg-indigo-700">
                         Run Payroll
@@ -288,8 +301,8 @@
                 @if(openDtrPeriods().has(group.id)) {
                   <div class="p-4">
                      <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                          <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 md:table">
+                          <thead class="bg-gray-50 dark:bg-gray-700/50 hidden md:table-header-group">
                             <tr>
                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Employee</th>
                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
@@ -299,13 +312,23 @@
                           </thead>
                           <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             @for(entry of group.entries; track entry.id) {
-                              <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ entry.profiles?.first_name }} {{ entry.profiles?.last_name }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ entry.time_in | date:'mediumDate' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400 font-semibold">{{ entry.time_in | date:'mediumTime' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400 font-semibold">
+                              <tr class="block md:table-row">
+                                <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Employee: </span>
+                                  <span class="text-gray-900 dark:text-white">{{ entry.profiles?.first_name }} {{ entry.profiles?.last_name }}</span>
+                                </td>
+                                <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Date: </span>
+                                  <span class="text-gray-500 dark:text-gray-400">{{ entry.time_in | date:'mediumDate' }}</span>
+                                </td>
+                                <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Time In: </span>
+                                  <span class="text-green-600 dark:text-green-400 font-semibold">{{ entry.time_in | date:'mediumTime' }}</span>
+                                </td>
+                                <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Time Out: </span>
                                   @if(entry.time_out) {
-                                    {{ entry.time_out | date:'mediumTime' }}
+                                    <span class="text-red-600 dark:text-red-400 font-semibold">{{ entry.time_out | date:'mediumTime' }}</span>
                                   } @else {
                                     <span class="text-gray-500">In Progress</span>
                                   }
@@ -346,8 +369,8 @@
                 </button>
                 @if(openPayrollMonths().has(group.monthYearValue)) {
                   <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                       <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 md:table">
+                       <thead class="bg-gray-50 dark:bg-gray-700/50 hidden md:table-header-group">
                           <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Employee</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Pay Period</th>
@@ -357,11 +380,21 @@
                         </thead>
                          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                           @for(payroll of group.payrolls; track payroll.id) {
-                            <tr>
-                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{{ payroll.profiles?.first_name }} {{ payroll.profiles?.last_name }}</td>
-                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ payroll.pay_period_start | date:'MMM d' }} - {{ payroll.pay_period_end | date:'MMM d, y' }}</td>
-                              <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 dark:text-gray-200">{{ payroll.net_pay | currency:'PHP' }}</td>
-                              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <tr class="block md:table-row">
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Employee: </span>
+                                <span class="text-gray-900 dark:text-white">{{ payroll.profiles?.first_name }} {{ payroll.profiles?.last_name }}</span>
+                              </td>
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Period: </span>
+                                <span class="text-gray-500 dark:text-gray-400">{{ payroll.pay_period_start | date:'MMM d' }} - {{ payroll.pay_period_end | date:'MMM d, y' }}</span>
+                              </td>
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm font-bold md:table-cell block">
+                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Net Pay: </span>
+                                <span class="text-gray-800 dark:text-gray-200">{{ payroll.net_pay | currency:'PHP' }}</span>
+                              </td>
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden mb-2 block">Status: </span>
                                 <select [value]="payroll.status" (change)="onPayrollStatusChange(payroll.id, $event)"
                                         class="text-xs font-semibold rounded-full border-none focus:ring-0 appearance-none py-1 pl-2.5 pr-8"
                                         [class.bg-green-100]="payroll.status === 'Paid'" [class.text-green-800]="payroll.status === 'Paid'" [class.dark:bg-green-900/50]="payroll.status === 'Paid'" [class.dark:text-green-300]="payroll.status === 'Paid'"
@@ -404,7 +437,7 @@
             </div>
           } @else {
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
-              <div class="grid grid-cols-5 gap-4 p-4 font-semibold text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 uppercase">
+              <div class="hidden md:grid grid-cols-5 gap-4 p-4 font-semibold text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 uppercase">
                 <div>Employee</div>
                 <div>Branch & Position</div>
                 <div>Today's Schedule</div>
@@ -413,17 +446,23 @@
               </div>
               <div class="divide-y divide-gray-200 dark:divide-gray-700">
                 @for(item of liveEmployeeStatus(); track item.profile.id) {
-                  <div class="grid grid-cols-5 gap-4 p-4 items-center">
+                  <div class="grid grid-cols-1 md:grid-cols-5 gap-y-2 md:gap-4 p-4 items-center">
                     <div>
+                      <div class="md:hidden text-xs font-bold uppercase text-gray-500 dark:text-gray-400">Employee</div>
                       <p class="font-bold text-gray-900 dark:text-white">{{ item.profile.first_name }} {{ item.profile.last_name }}</p>
                       <p class="text-xs text-gray-500 dark:text-gray-400">{{ item.profile.employee_id }}</p>
                     </div>
                     <div>
+                      <div class="md:hidden text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mt-2">Branch & Position</div>
                       <p class="text-sm text-gray-700 dark:text-gray-300 capitalize">{{ item.profile.branch }}</p>
                       <p class="text-sm text-gray-500 dark:text-gray-400 capitalize">{{ item.profile.position }}</p>
                     </div>
-                    <div class="text-sm text-gray-600 dark:text-gray-300">{{ item.todaysSchedule }}</div>
-                    <div class="text-center">
+                    <div>
+                      <div class="md:hidden text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mt-2">Today's Schedule</div>
+                      <p class="text-sm text-gray-600 dark:text-gray-300">{{ item.todaysSchedule }}</p>
+                    </div>
+                    <div class="text-left md:text-center">
+                      <div class="md:hidden text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mt-2">Status</div>
                       <span class="px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full"
                         [class.bg-green-100]="item.status === 'Timed In'" [class.text-green-800]="item.status === 'Timed In'"
                         [class.dark:bg-green-900/50]="item.status === 'Timed In'" [class.dark:text-green-300]="item.status === 'Timed In'"
@@ -448,8 +487,9 @@
                         {{ item.status }}
                       </span>
                     </div>
-                    <div class="text-right font-mono text-lg font-semibold text-gray-800 dark:text-gray-200">
-                      {{ item.timerDisplay }}
+                    <div class="text-left md:text-right">
+                      <div class="md:hidden text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mt-2">Timer</div>
+                      <p class="font-mono text-lg font-semibold text-gray-800 dark:text-gray-200">{{ item.timerDisplay }}</p>
                     </div>
                   </div>
                 }
@@ -516,35 +556,35 @@
           <canvas #canvas class="hidden"></canvas>
 
           @if (lastScanResult(); as result) {
-            <div class="absolute inset-0 flex flex-col items-center justify-center text-center bg-black/80 text-white p-8 animate-fade-in">
+            <div class="absolute inset-0 flex flex-col items-center justify-center text-center bg-black/80 text-white p-4 sm:p-8 animate-fade-in">
               @switch(result.status) {
                 @case('CLOCK_IN_WORK') {
                   <div class="w-full max-w-md p-6 rounded-lg bg-green-500/20 border border-green-500">
-                    <h3 class="text-3xl font-bold text-green-300">Timed In for Work</h3>
-                    <p class="mt-2 text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
-                    <p class="mt-4 text-gray-300">Your shift has started. Your next scan will be to clock out for your break.</p>
+                    <h3 class="text-2xl sm:text-3xl font-bold text-green-300">Timed In for Work</h3>
+                    <p class="mt-2 text-3xl sm:text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
+                    <p class="mt-4 text-sm text-gray-300">Your shift has started. Your next scan will be to clock out for your break.</p>
                   </div>
                 }
                 @case('CLOCK_OUT_BREAK') {
                   <div class="w-full max-w-md p-6 rounded-lg bg-yellow-500/20 border border-yellow-500">
-                    <h3 class="text-3xl font-bold text-yellow-300">Started Break</h3>
-                    <p class="mt-2 text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
-                    <p class="mt-4 text-4xl font-mono tracking-widest">{{ breakCountdownDisplay() }}</p>
-                    <p class="mt-2 text-gray-300">Your 1-hour break has begun. Your next scan will be to clock back in.</p>
+                    <h3 class="text-2xl sm:text-3xl font-bold text-yellow-300">Started Break</h3>
+                    <p class="mt-2 text-3xl sm:text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
+                    <p class="mt-4 text-3xl sm:text-4xl font-mono tracking-widest">{{ breakCountdownDisplay() }}</p>
+                    <p class="mt-2 text-sm text-gray-300">Your 1-hour break has begun. Your next scan will be to clock back in.</p>
                   </div>
                 }
                  @case('CLOCK_IN_BREAK') {
                   <div class="w-full max-w-md p-6 rounded-lg bg-green-500/20 border border-green-500">
-                    <h3 class="text-3xl font-bold text-green-300">Resumed Work</h3>
-                    <p class="mt-2 text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
-                    <p class="mt-4 text-gray-300">Your break has ended. Your next scan will be to clock out for the day.</p>
+                    <h3 class="text-2xl sm:text-3xl font-bold text-green-300">Resumed Work</h3>
+                    <p class="mt-2 text-3xl sm:text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
+                    <p class="mt-4 text-sm text-gray-300">Your break has ended. Your next scan will be to clock out for the day.</p>
                   </div>
                 }
                 @case('CLOCK_OUT_DAY') {
                    <div class="w-full max-w-md p-6 rounded-lg bg-blue-500/20 border border-blue-500">
-                    <h3 class="text-3xl font-bold text-blue-300">Timed Out for the Day</h3>
-                    <p class="mt-2 text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
-                    <p class="mt-4 text-gray-300">Your workday has ended. See you tomorrow!</p>
+                    <h3 class="text-2xl sm:text-3xl font-bold text-blue-300">Timed Out for the Day</h3>
+                    <p class="mt-2 text-3xl sm:text-5xl font-extrabold">{{ result.profile.first_name }} {{ result.profile.last_name }}</p>
+                    <p class="mt-4 text-sm text-gray-300">Your workday has ended. See you tomorrow!</p>
                   </div>
                 }
               }

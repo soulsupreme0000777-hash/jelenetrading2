@@ -283,7 +283,7 @@ export class AddEmployeeModalComponent {
     const canvas = this.qrCanvas()?.nativeElement;
     if (canvas && data) {
       QRCode.toCanvas(canvas, data, { width: 200, margin: 2 }, (error: any) => {
-        if (error) console.error('Failed to generate QR Code:', error);
+        if (error) console.error('Failed to generate QR Code:', error.message || error);
       });
     }
   }

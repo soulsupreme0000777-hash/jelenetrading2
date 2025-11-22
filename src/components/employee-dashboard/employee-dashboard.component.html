@@ -115,7 +115,7 @@
                 }
 
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-                  <div class="p-8">
+                  <div class="p-4 sm:p-8">
                     <!-- Profile Header -->
                     <div class="text-center sm:text-left">
                       <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ profile.first_name }} {{ profile.middle_name }} {{ profile.last_name }}</h2>
@@ -171,7 +171,7 @@
                             <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Emergency Leave</dt>
                             <dd class="mt-1 text-sm text-gray-900 dark:text-white">
                                 <p class="text-gray-600 dark:text-gray-300">Use this for unforeseen emergencies on the current day. This will use one of your available day-off balances.</p>
-                                <button (click)="openEmergencyLeaveConfirmation()" [disabled]="dayOffBalance() <= 0" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:bg-orange-400 disabled:cursor-not-allowed">
+                                <button (click)="openEmergencyLeaveConfirmation()" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:bg-orange-400 disabled:cursor-not-allowed">
                                   Request Emergency Leave for Today
                                 </button>
                             </dd>
@@ -244,13 +244,13 @@
                  } @else if(scheduleError()) {
                   <p class="text-center p-8 text-red-500 dark:text-red-400">{{ scheduleError() }}</p>
                  } @else {
-                  <div class="p-2">
+                  <div class="p-1 sm:p-2">
                     <div class="grid grid-cols-7 gap-px">
                       @for(day of ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; track day) {
                         <div class="text-center text-xs font-semibold text-gray-500 dark:text-gray-400 py-2">{{day}}</div>
                       }
                       @for(day of calendarDays(); track day.dateStr) {
-                        <div class="relative min-h-[100px] p-2 border-t border-l border-gray-200 dark:border-gray-700"
+                        <div class="relative min-h-[90px] sm:min-h-[100px] p-1 sm:p-2 border-t border-l border-gray-200 dark:border-gray-700"
                             [class.bg-white]="day.isCurrentMonth"
                             [class.dark:bg-gray-800]="day.isCurrentMonth"
                             [class.bg-gray-50]="!day.isCurrentMonth"
@@ -312,15 +312,15 @@
                   <div class="p-6 border-b border-gray-200 dark:border-gray-700">
                       <h3 class="text-xl font-bold text-gray-900 dark:text-white">Time Log History</h3>
                   </div>
-                  <div class="p-6">
+                  <div class="p-4 sm:p-6">
                     @if(dtrLoading()) {
                       <p class="text-center text-gray-500 dark:text-gray-400">Loading your time log...</p>
                     } @else if (dtrHistory().length === 0) {
                       <p class="text-center text-gray-500 dark:text-gray-400">You have no time entries yet.</p>
                     } @else {
                       <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                          <thead class="bg-gray-50 dark:bg-gray-700">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 md:table">
+                          <thead class="bg-gray-50 dark:bg-gray-700 hidden md:table-header-group">
                             <tr>
                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Clock In</th>
@@ -329,11 +329,18 @@
                           </thead>
                           <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             @for(entry of dtrHistory(); track entry.id) {
-                              <tr>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ entry.time_in | date:'longDate' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400 font-semibold">{{ entry.time_in | date:'mediumTime' }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400 font-semibold">
-                                  @if(entry.time_out) { {{ entry.time_out | date:'mediumTime' }} } 
+                              <tr class="block md:table-row">
+                                <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm font-medium md:table-cell block">
+                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Date: </span>
+                                  <span class="text-gray-900 dark:text-white">{{ entry.time_in | date:'longDate' }}</span>
+                                </td>
+                                <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Clock In: </span>
+                                  <span class="text-green-600 dark:text-green-400 font-semibold">{{ entry.time_in | date:'mediumTime' }}</span>
+                                </td>
+                                <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Clock Out: </span>
+                                  @if(entry.time_out) { <span class="text-red-600 dark:text-red-400 font-semibold">{{ entry.time_out | date:'mediumTime' }}</span> } 
                                   @else { <span class="text-gray-500">In Progress</span> }
                                 </td>
                               </tr>
@@ -352,7 +359,7 @@
                 <div class="p-6 border-b border-gray-200 dark:border-gray-700">
                     <h3 class="text-xl font-bold text-gray-900 dark:text-white">Payroll History</h3>
                 </div>
-                <div class="p-6">
+                <div class="p-4 sm:p-6">
                   @if(payrollsLoading()) {
                     <p class="text-center text-gray-500 dark:text-gray-400">Loading your payroll history...</p>
                   } @else if (payrollsError()) {
@@ -364,8 +371,8 @@
                      <p class="text-center text-gray-500 dark:text-gray-400">No payroll records have been generated for you yet.</p>
                   } @else {
                     <div class="overflow-x-auto">
-                      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
+                      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 md:table">
+                        <thead class="bg-gray-50 dark:bg-gray-700 hidden md:table-header-group">
                           <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Pay Period</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Gross Pay</th>
@@ -376,12 +383,25 @@
                         </thead>
                         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                           @for(p of payrolls(); track p.id) {
-                            <tr class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50" (click)="togglePayrollDetails(p.id)">
-                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ p.pay_period_start | date:'mediumDate' }} to {{ p.pay_period_end | date:'mediumDate' }}</td>
-                              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ p.gross_pay | currency:'PHP' }}</td>
-                              <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500 dark:text-red-400">{{ (p.lateness_deductions + p.undertime_deductions + p.manual_deductions) | currency:'PHP' }}</td>
-                              <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-700 dark:text-gray-200">{{ p.net_pay | currency:'PHP' }}</td>
-                              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <tr class="block md:table-row cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50" (click)="togglePayrollDetails(p.id)">
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 md:table-cell block">
+                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Period: </span>
+                                  {{ p.pay_period_start | date:'mediumDate' }} to {{ p.pay_period_end | date:'mediumDate' }}
+                              </td>
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 md:table-cell block">
+                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Gross Pay: </span>
+                                {{ p.gross_pay | currency:'PHP' }}
+                              </td>
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm text-red-500 dark:text-red-400 md:table-cell block">
+                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Deductions: </span>
+                                {{ (p.lateness_deductions + p.undertime_deductions + p.manual_deductions) | currency:'PHP' }}
+                              </td>
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm font-bold text-gray-700 dark:text-gray-200 md:table-cell block">
+                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Net Pay: </span>
+                                {{ p.net_pay | currency:'PHP' }}
+                              </td>
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
+                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden mb-1 block">Status: </span>
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
                                   [class.bg-yellow-100]="p.status === 'Delayed'" [class.text-yellow-800]="p.status === 'Delayed'"
                                   [class.dark:bg-yellow-900/50]="p.status === 'Delayed'" [class.dark:text-yellow-300]="p.status === 'Delayed'"
@@ -394,15 +414,22 @@
                               </td>
                             </tr>
                             @if (expandedPayrollId() === p.id) {
-                              <tr class="bg-gray-50 dark:bg-gray-900/50">
-                                <td colspan="5" class="p-6">
+                              <tr class="block md:table-row bg-gray-50 dark:bg-gray-900/50">
+                                <td colspan="5" class="p-4 md:p-6 block md:table-cell">
                                   <h4 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-4">Calculation Breakdown</h4>
                                   <dl class="space-y-3 p-4 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">
                                     <div class="flex justify-between items-center">
                                       <dt class="text-sm text-gray-600 dark:text-gray-400">Gross Pay</dt>
                                       <dd class="text-sm font-medium text-gray-900 dark:text-white">{{ p.gross_pay | currency:'PHP' }}</dd>
                                     </div>
-                                     @if(p.salary_raise > 0) {
+                                    @if(p.raise_details && p.raise_details.length > 0) {
+                                      @for(raise of p.raise_details; track raise.name) {
+                                        <div class="flex justify-between items-center">
+                                          <dt class="text-sm text-gray-600 dark:text-gray-400">{{ raise.name }}</dt>
+                                          <dd class="text-sm font-medium text-green-600 dark:text-green-400">+ {{ raise.amount | currency:'PHP' }}</dd>
+                                        </div>
+                                      }
+                                    } @else if (p.salary_raise > 0) {
                                       <div class="flex justify-between items-center">
                                         <dt class="text-sm text-gray-600 dark:text-gray-400">Salary Raise</dt>
                                         <dd class="text-sm font-medium text-green-600 dark:text-green-400">+ {{ p.salary_raise | currency:'PHP' }}</dd>
