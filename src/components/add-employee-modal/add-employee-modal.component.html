@@ -21,8 +21,27 @@
 
           <form class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4" (ngSubmit)="onSubmit()">
             <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Profile Picture</label>
+                <div class="mt-2 flex items-center space-x-4">
+                  <span class="inline-block h-20 w-20 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700">
+                    @if(avatarPreviewUrl()) {
+                      <img class="h-full w-full object-cover" [src]="avatarPreviewUrl()" alt="Profile preview">
+                    } @else {
+                      <svg class="h-full w-full text-gray-300 dark:text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M24 20.993V24H0v-2.993A1 1 0 001 18h22a1 1 0 001 2.993zM12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z" />
+                      </svg>
+                    }
+                  </span>
+                  <input type="file" #fileInput hidden (change)="onFileSelected($event)" accept="image/png, image/jpeg, image/webp">
+                  <button type="button" (click)="fileInput.click()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors">
+                    Change
+                  </button>
+                </div>
+            </div>
+            
+            <div class="md:col-span-2">
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Employee ID</label>
-              <input type="text" [ngModel]="employeeId()" (ngModelChange)="employeeId.set($event)" name="employeeId" required placeholder="e.g., ATC-00158" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+              <input type="text" [ngModel]="employeeId()" (ngModelChange)="employeeId.set($event)" name="employeeId" required placeholder="e.g., ATC-00158" [readonly]="isEditMode()" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200" [class.cursor-not-allowed]="isEditMode()" [class.opacity-70]="isEditMode()">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">First Name</label>
@@ -50,7 +69,7 @@
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Hire Date</label>
-              <input type="date" [ngModel]="hireDate()" (ngModelChange)="hireDate.set($event)" name="hireDate" required class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+              <input type="date" [ngModel]="hireDate()" (ngModelChange)="hireDate.set($event)" name="hireDate" required [readonly]="isEditMode()" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200" [class.cursor-not-allowed]="isEditMode()" [class.opacity-70]="isEditMode()">
             </div>
             <div class="md:col-span-2">
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
@@ -87,20 +106,20 @@
             
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Branch</label>
-              <select name="branch" required [ngModel]="branch()" (ngModelChange)="branch.set($event)" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200 capitalize">
+              <select name="branch" required [ngModel]="branchId()" (ngModelChange)="branchId.set(+$event)" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200 capitalize">
                 <option value="" disabled>Select a branch</option>
-                @for(b of branches; track b) {
-                  <option [value]="b" class="capitalize">{{ b }}</option>
+                @for(b of branches(); track b.id) {
+                  <option [value]="b.id" class="capitalize">{{ b.name }}</option>
                 }
               </select>
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Position</label>
-              <select name="position" required [ngModel]="position()" (ngModelChange)="position.set($event)" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200 capitalize">
+              <select name="position" required [ngModel]="positionId()" (ngModelChange)="positionId.set(+$event)" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200 capitalize">
                 <option value="" disabled>Select a position</option>
-                @for(p of positions; track p) {
-                  <option [value]="p" class="capitalize">{{ p }}</option>
+                @for(p of positions(); track p.id) {
+                  <option [value]="p.id" class="capitalize">{{ p.name }}</option>
                 }
               </select>
             </div>
@@ -161,14 +180,5 @@
         }
       }
     </div>
-
-    <app-confirmation-modal
-      [visible]="isConfirmCancelVisible()"
-      title="Discard Changes?"
-      message="You have unsaved changes. Are you sure you want to close the form?"
-      (close)="handleAbortCancel()"
-      (confirm)="handleConfirmCancel()">
-    </app-confirmation-modal>
-
   </div>
 }

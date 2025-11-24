@@ -1,26 +1,12 @@
 import { Component, ChangeDetectionStrategy, input, output, signal, viewChild, ElementRef, computed, effect, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { SupabaseService, NewUserPayload, UserWithProfile, Profile } from '../../services/supabase.service';
+import { SupabaseService, NewUserPayload, UserWithProfile, Profile, Position, Branch, PositionRate } from '../../services/supabase.service';
 import QRCode from 'qrcode';
 import { ConfirmationModalComponent } from '../confirmation-modal/confirmation-modal.component';
 
 type ModalState = 'form' | 'loading' | 'success' | 'error';
 
-const RATES = {
-  cabanatuan: {
-    'branch officer': 575,
-    'team leader': 565,
-    'regular staff': 560,
-  },
-  solano: {
-    'branch officer': 550,
-    'team leader': 500,
-    'regular staff': 500,
-  }
-} as const;
-
-type Branch = keyof typeof RATES;
-type Position = keyof typeof RATES[Branch];
+declare var Cropper: any;
 
 @Component({
   selector: 'app-add-employee-modal',
@@ -38,8 +24,10 @@ export class AddEmployeeModalComponent {
 
   private readonly supabaseService = inject(SupabaseService);
   
-  readonly positions: Position[] = ['branch officer', 'team leader', 'regular staff'];
-  readonly branches: Branch[] = ['cabanatuan', 'solano'];
+  // Dynamic data from DB
+  positions = signal<Position[]>([]);
+  branches = signal<Branch[]>([]);
+  positionRates = signal<PositionRate[]>([]);
 
   isEditMode = computed(() => !!this.employeeToEdit());
 
@@ -53,12 +41,14 @@ export class AddEmployeeModalComponent {
   email = signal('');
   password = signal('');
   confirmPassword = signal('');
-  position = signal<Position | ''>('');
-  branch = signal<Branch | ''>('');
+  positionId = signal<number | ''>('');
+  branchId = signal<number | ''>('');
   mobileNumber = signal('');
   hireDate = signal('');
   birthDate = signal('');
   selectedRole = signal<'admin' | 'employee'>('employee');
+  avatarPreviewUrl = signal<string | null>(null);
+  selectedFile = signal<File | null>(null);
   
   modalState = signal<ModalState>('form');
   errorMessage = signal<string | null>(null);
@@ -66,7 +56,13 @@ export class AddEmployeeModalComponent {
   
   isConfirmCancelVisible = signal(false);
   private initialFormState = signal<Partial<Profile & { password?: string, confirmPassword?: string }>>({});
-
+  
+  // Image Cropper State
+  isCropperVisible = signal(false);
+  cropperImage = viewChild<ElementRef<HTMLImageElement>>('cropperImage');
+  private cropper: any | null = null;
+  private originalFile: File | null = null;
+  
   age = computed<number | null>(() => {
     const birthDateStr = this.birthDate();
     if (!birthDateStr) return null;
@@ -88,10 +84,11 @@ export class AddEmployeeModalComponent {
   });
 
   dailyRate = computed<number | null>(() => {
-    const p = this.position();
-    const b = this.branch();
-    if (p && b) {
-      return RATES[b][p];
+    const posId = this.positionId();
+    const braId = this.branchId();
+    if (posId && braId) {
+      const rate = this.positionRates().find(r => r.position_id === posId && r.branch_id === braId);
+      return rate ? rate.daily_rate : null;
     }
     return null;
   });
@@ -100,11 +97,15 @@ export class AddEmployeeModalComponent {
   
   isFormValid = computed(() => {
     const passwordValid = this.isEditMode() || (this.password() && this.password().length >= 6 && this.passwordMatch());
-    return this.employeeId() && this.firstName() && this.middleName() && this.lastName() && this.email() && passwordValid && this.position() && this.branch() && this.age() !== null && this.mobileNumber() && this.hireDate() && this.birthDate();
+    return this.employeeId() && this.firstName() && this.middleName() && this.lastName() && this.email() && passwordValid && this.positionId() && this.branchId() && this.age() !== null && this.mobileNumber() && this.hireDate() && this.birthDate();
   });
 
   isDirty = computed(() => {
     const initial = this.initialFormState();
+    if (this.selectedFile() !== null) {
+      return true;
+    }
+
     if (this.isEditMode()) {
         return (
             this.employeeId() !== (initial.employee_id || '') ||
@@ -115,8 +116,8 @@ export class AddEmployeeModalComponent {
             this.hireDate() !== (initial.hire_date || '') ||
             this.birthDate() !== (initial.birth_date || '') ||
             this.selectedRole() !== (initial.role === 'admin' ? 'admin' : 'employee') ||
-            this.position() !== ((initial.position as Position | null) || '') ||
-            this.branch() !== ((initial.branch as Branch | null) || '')
+            this.positionId() !== ((initial.position_id as number | null) || '') ||
+            this.branchId() !== ((initial.branch_id as number | null) || '')
         );
     } else {
         return (
@@ -130,13 +131,15 @@ export class AddEmployeeModalComponent {
             this.mobileNumber() !== '' ||
             this.hireDate() !== '' ||
             this.birthDate() !== '' ||
-            this.position() !== '' ||
-            this.branch() !== ''
+            this.positionId() !== '' ||
+            this.branchId() !== ''
         );
     }
   });
   
   constructor() {
+    this.loadDynamicData();
+
     effect(() => {
       if (this.visible()) {
         const emp = this.employeeToEdit();
@@ -151,8 +154,9 @@ export class AddEmployeeModalComponent {
             hire_date: emp.hire_date,
             birth_date: emp.birth_date,
             role: emp.role,
-            position: emp.position,
-            branch: emp.branch,
+            position_id: emp.position_id,
+            branch_id: emp.branch_id,
+            avatar_url: emp.avatar_url,
           });
         } else {
           this.resetState();
@@ -160,6 +164,91 @@ export class AddEmployeeModalComponent {
         }
       }
     });
+
+    effect(() => {
+      const cropperImageEl = this.cropperImage()?.nativeElement;
+      if (this.isCropperVisible() && cropperImageEl && this.originalFile) {
+        if (this.cropper) {
+            this.cropper.destroy();
+        }
+        cropperImageEl.src = URL.createObjectURL(this.originalFile);
+        this.cropper = new Cropper(cropperImageEl, {
+            aspectRatio: 1,
+            viewMode: 1,
+            background: false,
+            responsive: true,
+            checkOrientation: false,
+            movable: true,
+            zoomable: true,
+            scalable: true,
+        });
+      }
+    });
+  }
+
+  async loadDynamicData() {
+    try {
+        const [positionsRes, branchesRes, ratesRes] = await Promise.all([
+            this.supabaseService.getPositions(),
+            this.supabaseService.getBranches(),
+            this.supabaseService.getPositionRates()
+        ]);
+        if (positionsRes.error) throw positionsRes.error;
+        this.positions.set(positionsRes.data || []);
+        if (branchesRes.error) throw branchesRes.error;
+        this.branches.set(branchesRes.data || []);
+        if (ratesRes.error) throw ratesRes.error;
+        this.positionRates.set(ratesRes.data || []);
+    } catch (e: any) {
+        this.errorMessage.set(`Failed to load form data: ${e.message}`);
+    }
+  }
+
+
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        this.errorMessage.set('File is too large. Maximum size is 5MB.');
+        return;
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        this.errorMessage.set('Invalid file type. Only JPG, PNG, and WEBP are allowed.');
+        return;
+      }
+      this.originalFile = file;
+      this.isCropperVisible.set(true);
+      this.errorMessage.set(null); // Clear previous errors
+      input.value = ''; // Reset input so the same file can be chosen again
+    }
+  }
+
+  saveCroppedImage(): void {
+    if (!this.cropper || !this.originalFile) return;
+    this.cropper.getCroppedCanvas({
+        width: 512,
+        height: 512,
+        imageSmoothingQuality: 'high',
+    }).toBlob((blob: Blob | null) => {
+        if (blob) {
+            const fileExtension = this.originalFile!.name.split('.').pop() || 'png';
+            const mimeType = this.originalFile!.type;
+            const croppedFile = new File([blob], `avatar.${fileExtension}`, { type: mimeType });
+            this.selectedFile.set(croppedFile);
+            this.avatarPreviewUrl.set(URL.createObjectURL(croppedFile));
+        }
+        this.closeCropper();
+    });
+  }
+
+  closeCropper(): void {
+    this.isCropperVisible.set(false);
+    if (this.cropper) {
+        this.cropper.destroy();
+        this.cropper = null;
+    }
+    this.originalFile = null;
   }
 
   private populateForm(employee: Profile): void {
@@ -173,8 +262,9 @@ export class AddEmployeeModalComponent {
     this.hireDate.set(employee.hire_date || '');
     this.birthDate.set(employee.birth_date || '');
     this.selectedRole.set(employee.role === 'admin' ? 'admin' : 'employee');
-    this.position.set((employee.position as Position | null) || '');
-    this.branch.set((employee.branch as Branch | null) || '');
+    this.positionId.set(employee.position_id || '');
+    this.branchId.set(employee.branch_id || '');
+    this.avatarPreviewUrl.set(employee.avatar_url || null);
   }
 
   async onSubmit(): Promise<void> {
@@ -223,6 +313,9 @@ export class AddEmployeeModalComponent {
   }
 
   private async handleCreateEmployee(): Promise<void> {
+    const selectedPosition = this.positions().find(p => p.id === this.positionId());
+    const selectedBranch = this.branches().find(b => b.id === this.branchId());
+
     const payload: NewUserPayload = {
       email: this.email(),
       password: this.password(),
@@ -233,8 +326,10 @@ export class AddEmployeeModalComponent {
         last_name: this.lastName(),
         age: this.age(),
         mobile_number: this.mobileNumber(),
-        position: this.position() || null,
-        branch: this.branch() || null,
+        position: selectedPosition?.name as Profile['position'],
+        branch: selectedBranch?.name as Profile['branch'],
+        position_id: this.positionId() as number,
+        branch_id: this.branchId() as number,
         daily_rate: this.dailyRate(),
         role: this.selectedRole(),
         hire_date: this.hireDate(),
@@ -245,6 +340,18 @@ export class AddEmployeeModalComponent {
     };
 
     const { user, profile, qrData } = await this.supabaseService.createNewUser(payload);
+    
+    if (this.selectedFile()) {
+      const avatarUrl = await this.supabaseService.uploadAvatar(user.id, this.selectedFile()!);
+      const { error } = await this.supabaseService.updateUserProfile(user.id, { avatar_url: avatarUrl });
+      if (error) {
+          // Log the error but continue, as the user is already created.
+          console.error('User created, but failed to update avatar:', error.message);
+      } else {
+          profile.avatar_url = avatarUrl;
+      }
+    }
+    
     this.newUser.set({ ...user, profile } as UserWithProfile);
     this.modalState.set('success');
     
@@ -255,21 +362,28 @@ export class AddEmployeeModalComponent {
     const employee = this.employeeToEdit();
     if (!employee) throw new Error("No employee selected for editing.");
     
+    const selectedPosition = this.positions().find(p => p.id === this.positionId());
+    const selectedBranch = this.branches().find(b => b.id === this.branchId());
+
     const profileData: Partial<Profile> = {
-      employee_id: this.employeeId(),
       first_name: this.firstName(),
       middle_name: this.middleName(),
       last_name: this.lastName(),
       age: this.age(),
       mobile_number: this.mobileNumber(),
-      position: this.position() || null,
-      branch: this.branch() || null,
+      position: selectedPosition?.name as Profile['position'],
+      branch: selectedBranch?.name as Profile['branch'],
+      position_id: this.positionId() as number,
+      branch_id: this.branchId() as number,
       daily_rate: this.dailyRate(),
       role: this.selectedRole(),
-      hire_date: this.hireDate(),
       birth_date: this.birthDate(),
     };
     
+    if (this.selectedFile()) {
+        profileData.avatar_url = await this.supabaseService.uploadAvatar(employee.id, this.selectedFile()!);
+    }
+
     const { error } = await this.supabaseService.updateUserProfile(employee.id, profileData);
     if (error) {
       console.error('Error updating employee profile:', error);
@@ -338,12 +452,15 @@ export class AddEmployeeModalComponent {
     this.email.set('');
     this.password.set('');
     this.confirmPassword.set('');
-    this.position.set('');
-    this.branch.set('');
+    this.positionId.set('');
+    this.branchId.set('');
     this.mobileNumber.set('');
     this.hireDate.set('');
     this.birthDate.set('');
     this.newUser.set(null);
     this.selectedRole.set('employee');
+    this.avatarPreviewUrl.set(null);
+    this.selectedFile.set(null);
+    this.closeCropper();
   }
 }

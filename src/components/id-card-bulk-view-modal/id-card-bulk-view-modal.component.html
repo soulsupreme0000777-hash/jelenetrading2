@@ -1,0 +1,84 @@
+@if (visible()) {
+  <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm" (click)="closeModal()">
+    <div class="relative w-full max-w-5xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl m-4 max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+      
+      <!-- Header -->
+      <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center no-print">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Employee ID Cards</h2>
+        <div class="flex gap-3">
+          <button (click)="printCards()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V4a2 2 0 00-2-2H5zm0 2h10v7H5V4z m2 9a1 1 0 00-1 1v1a1 1 0 102 0v-1a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+            Print
+          </button>
+          <button (click)="closeModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600">Close</button>
+        </div>
+      </div>
+
+      <!-- Printable Area -->
+      <div class="overflow-y-auto bg-gray-200 dark:bg-gray-900 flex-grow p-4">
+        <div class="id-card-bulk-print-area max-w-none mx-auto">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 id-card-grid">
+            @for (emp of employees(); track emp.id) {
+              <div class="id-card-container aspect-[2.125/3.37] bg-white dark:bg-slate-800 rounded-lg shadow-md overflow-hidden font-sans flex flex-col">
+                <!-- Card Header -->
+                <div class="bg-indigo-600 dark:bg-indigo-700 p-2 text-center">
+                  <h2 class="text-lg font-bold text-white tracking-wider">Jelene Trading</h2>
+                </div>
+                
+                <!-- Card Body -->
+                <div class="p-4 flex flex-col items-center space-y-3 flex-grow justify-center">
+                  
+                  <!-- Avatar -->
+                  <div class="flex-shrink-0">
+                    @if(emp.avatar_url) {
+                        <img [src]="emp.avatar_url" alt="Profile" class="h-20 w-20 rounded-full object-cover ring-2 ring-offset-2 ring-offset-slate-800 ring-indigo-400">
+                    } @else {
+                        <span class="h-20 w-20 rounded-full bg-slate-700 flex items-center justify-center ring-2 ring-offset-2 ring-offset-slate-800 ring-indigo-400">
+                            <svg class="h-12 w-12 text-slate-500" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M24 20.993V24H0v-2.993A1 1 0 001 18h22a1 1 0 001 2.993zM12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"></path>
+                            </svg>
+                        </span>
+                    }
+                  </div>
+
+                  <!-- Employee Info -->
+                  <div class="w-full text-center">
+                    <p class="font-bold text-xl text-gray-800 dark:text-gray-100 leading-tight">{{ emp.first_name }} {{ emp.last_name }}</p>
+                    <p class="text-sm font-semibold capitalize text-indigo-500 dark:text-indigo-400">{{ emp.position }}</p>
+                    @if(emp.employee_id) {
+                      <p class="text-xs font-mono text-gray-500 dark:text-gray-400 mt-1">{{ emp.employee_id }}</p>
+                    }
+                  </div>
+                  
+                  <div (click)="enlargeQrCode(emp)" class="p-1 bg-white border dark:border-gray-600 rounded-md shadow-sm cursor-pointer">
+                    <canvas #qrCanvas></canvas>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Enlarged QR Code Overlay -->
+      @if (enlargedQrEmployee(); as emp) {
+        <div class="absolute inset-0 z-10 flex items-center justify-center bg-black/70 backdrop-blur-sm" (click)="closeEnlargedQr()">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-6" (click)="$event.stopPropagation()">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white">QR Code for {{ emp.first_name }} {{ emp.last_name }}</h3>
+                <div class="p-4 bg-white border dark:border-gray-600 rounded-lg shadow-md">
+                    <canvas #largeQrCanvas></canvas>
+                </div>
+                <div class="w-full flex gap-4">
+                    <button (click)="closeEnlargedQr()" class="flex-1 px-4 py-3 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">Back</button>
+                    <button (click)="downloadQrCode()" class="flex-1 px-4 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 flex items-center justify-center gap-2">
+                       <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                       Download QR
+                    </button>
+                </div>
+            </div>
+        </div>
+      }
+
+    </div>
+  </div>
+}

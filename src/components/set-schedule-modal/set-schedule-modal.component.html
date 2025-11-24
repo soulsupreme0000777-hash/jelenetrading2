@@ -16,18 +16,34 @@
         <div class="w-full md:w-80 lg:w-96 p-6 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 flex flex-col flex-shrink-0 space-y-6 overflow-y-auto">
           <div>
             <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">1. Select Employees</h3>
-            <div class="mt-4 p-2 border dark:border-gray-600 rounded-lg max-h-48 md:max-h-60 overflow-y-auto">
-              <div class="flex items-center p-2 border-b dark:border-gray-600">
-                <input type="checkbox" id="select-all" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" [checked]="isAllSelected()" (change)="toggleAllEmployees()">
-                <label for="select-all" class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-100">Select All</label>
-              </div>
-              <div class="space-y-1 mt-1">
-                @for(emp of employees(); track emp.id) {
-                  <div class="flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                    <input type="checkbox" [id]="'emp-'+emp.id" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" [checked]="selectedEmployeeIds().has(emp.id)" (change)="toggleEmployeeSelection(emp.id)">
-                    <label [for]="'emp-'+emp.id" class="ml-3 text-sm text-gray-700 dark:text-gray-300">{{ emp.first_name }} {{ emp.last_name }}</label>
+            <div class="mt-4 border dark:border-gray-600 rounded-lg">
+               <div class="border-b dark:border-gray-600">
+                  <button (click)="toggleAllEmployees()" class="w-full flex items-center p-3 rounded-t-lg text-left transition-colors" [class.bg-indigo-100]="isAllSelected()" [class.dark:bg-indigo-900/50]="isAllSelected()">
+                    @if(isAllSelected()) {
+                      <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2.929 2.929a1 1 0 011.414 0L10 8.586l5.657-5.657a1 1 0 111.414 1.414L11.414 10l5.657 5.657a1 1 0 01-1.414 1.414L10 11.414l-5.657 5.657a1 1 0 01-1.414-1.414L8.586 10 2.929 4.343a1 1 0 010-1.414z" /></svg>
+                    } @else {
+                      <svg class="w-5 h-5 text-gray-400 dark:text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    }
+                    <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-100">Select/Deselect All</span>
+                  </button>
+                </div>
+                <div class="max-h-48 md:max-h-60 overflow-y-auto">
+                  <div class="space-y-1 p-1">
+                    @for(emp of employees(); track emp.id) {
+                      <button (click)="toggleEmployeeSelection(emp.id)" class="w-full flex items-center p-2 rounded-md text-left transition-colors"
+                          [class.bg-indigo-100]="selectedEmployeeIds().has(emp.id)"
+                          [class.dark:bg-indigo-900/50]="selectedEmployeeIds().has(emp.id)"
+                          [class.hover:bg-gray-100]="!selectedEmployeeIds().has(emp.id)"
+                          [class.dark:hover:bg-gray-700]="!selectedEmployeeIds().has(emp.id)">
+                        @if(selectedEmployeeIds().has(emp.id)) {
+                          <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                        } @else {
+                          <svg class="w-5 h-5 text-gray-400 dark:text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        }
+                        <span class="ml-3 text-sm text-gray-700 dark:text-gray-300">{{ emp.first_name }} {{ emp.last_name }}</span>
+                      </button>
+                    }
                   </div>
-                }
               </div>
             </div>
           </div>
@@ -45,13 +61,16 @@
                 <button (click)="applyToAllWeekdays()" class="w-full text-center py-2.5 rounded-lg border-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white dark:hover:bg-indigo-500 dark:hover:text-white transition-colors text-sm font-medium">
                     Apply to all Weekdays
                 </button>
+                <button (click)="nextMonth()" class="w-full text-center py-2.5 rounded-lg border-2 border-gray-400 text-gray-600 dark:text-gray-300 hover:bg-gray-400 hover:text-white dark:hover:bg-gray-500 transition-colors text-sm font-medium">
+                    Schedule Next Month
+                </button>
                 <p class="text-xs text-gray-500 dark:text-gray-400 text-center">Or click individual days on the calendar to assign/clear schedules.</p>
             </div>
           </div>
         </div>
 
         <!-- Right Panel: Calendar -->
-        <div class="flex-grow p-4 sm:p-6 flex flex-col overflow-y-auto">
+        <div class="flex-grow p-4 sm:p-6 flex flex-col min-h-0">
            @if (modalState() === 'loading') {
               <div class="flex-grow flex items-center justify-center">
                   <p class="text-gray-500 dark:text-gray-400">Loading schedules...</p>
@@ -62,7 +81,7 @@
               </div>
            } @else {
             <!-- Calendar Header -->
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center justify-between mb-4 flex-shrink-0">
               <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{ currentDate() | date:'MMMM yyyy' }}</h3>
               <div class="flex items-center space-x-2">
                 <button (click)="previousMonth()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -73,55 +92,99 @@
                 </button>
               </div>
             </div>
+             @if (selectedEmployeeIds().size > 0) {
+              <p class="text-xs text-center text-gray-500 dark:text-gray-400 mb-2 -mt-2">
+                Showing schedules for {{ selectedEmployeeIds().size }} selected employee(s).
+              </p>
+            }
 
             <!-- Calendar Grid -->
-            <div class="grid grid-cols-7 gap-px flex-grow bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-              @for(day of weekDays; track day) {
-                <div class="text-center text-xs font-semibold text-gray-500 dark:text-gray-400 py-2 bg-gray-50 dark:bg-gray-800">{{day}}</div>
-              }
-              @for(day of calendarDays(); track day.dateStr) {
-                <div class="relative p-1 sm:p-2 min-h-[90px] sm:min-h-[100px]"
-                    [class.bg-white]="day.isCurrentMonth"
-                    [class.dark:bg-gray-900]="day.isCurrentMonth"
-                    [class.bg-gray-50]="!day.isCurrentMonth"
-                    [class.dark:bg-gray-800]="!day.isCurrentMonth"
-                    [class.text-gray-400]="!day.isCurrentMonth"
-                    [class.dark:text-gray-500]="!day.isCurrentMonth">
-                  <time [attr.datetime]="day.dateStr" 
-                        class="font-semibold text-sm"
-                        [class.text-white]="day.isToday"
-                        [class.bg-indigo-600]="day.isToday"
-                        [class.rounded-full]="day.isToday"
-                        [class.w-6]="day.isToday"
-                        [class.h-6]="day.isToday"
-                        [class.flex]="day.isToday"
-                        [class.items-center]="day.isToday"
-                        [class.justify-center]="day.isToday">
-                    {{ day.dayOfMonth }}
-                  </time>
-                  <div class="absolute inset-0 group">
-                      <div class="absolute inset-0 bg-indigo-500 opacity-0 group-hover:opacity-20 transition-opacity"></div>
-                      <div class="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <button (click)="applyScheduleToDay(day.dateStr)" class="p-1 rounded-full bg-green-500 text-white hover:bg-green-600" title="Apply schedule to selected employees">
-                            <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-                         </button>
-                         <button (click)="clearScheduleForDay(day.dateStr)" class="p-1 rounded-full bg-red-500 text-white hover:bg-red-600" title="Clear schedule for selected employees">
-                           <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-                         </button>
-                      </div>
-                  </div>
+            <div class="relative flex-grow overflow-y-auto">
+              <div class="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700">
+                @for(day of weekDays; track day) {
+                  <div class="text-center text-xs font-semibold text-gray-500 dark:text-gray-400 py-2 bg-gray-50 dark:bg-gray-800">{{day}}</div>
+                }
+                @for(day of calendarDays(); track day.dateStr) {
+                  <div class="relative p-1 sm:p-2 min-h-[90px] sm:min-h-[100px] transition-colors"
+                      (click)="openDayViewer(day)"
+                      [class.bg-white]="day.isCurrentMonth" [class.dark:bg-gray-900]="day.isCurrentMonth"
+                      [class.bg-gray-50]="!day.isCurrentMonth" [class.dark:bg-gray-800]="!day.isCurrentMonth"
+                      [class.text-gray-400]="!day.isCurrentMonth" [class.dark:text-gray-500]="!day.isCurrentMonth"
+                      
+                      [class.bg-gray-100]="day.isPast" [class.dark:bg-gray-800/50]="day.isPast" [class.opacity-60]="day.isPast"
 
-                  <!-- Display assigned schedules -->
-                  @for(emp of employees(); track emp.id) {
-                    @if(schedules().has(emp.id + '|' + day.dateStr)) {
-                      <div class="mt-1 p-0.5 rounded-sm text-[10px] truncate"
-                          [style.background-color]="selectedEmployeeIds().has(emp.id) ? '#4f46e5' : '#e0e7ff'"
-                          [style.color]="selectedEmployeeIds().has(emp.id) ? 'white' : '#4338ca'"
-                          [title]="emp.first_name + ' ' + emp.last_name + ': ' + schedules().get(emp.id + '|' + day.dateStr)">
-                          {{ emp.first_name }}
-                      </div>
-                    }
-                  }
+                      [class.cursor-pointer]="!day.isPast" [class.hover:bg-indigo-50]="!day.isPast" [class.dark:hover:bg-indigo-900/20]="!day.isPast"
+                      [class.cursor-not-allowed]="day.isPast">
+
+                    <time [attr.datetime]="day.dateStr" 
+                          class="font-semibold text-sm"
+                          [class.text-white]="day.isToday"
+                          [class.bg-indigo-600]="day.isToday"
+                          [class.rounded-full]="day.isToday"
+                          [class.w-6]="day.isToday"
+                          [class.h-6]="day.isToday"
+                          [class.flex]="day.isToday"
+                          [class.items-center]="day.isToday"
+                          [class.justify-center]="day.isToday">
+                      {{ day.dayOfMonth }}
+                    </time>
+                    
+                    <!-- Display assigned schedules -->
+                    <div class="space-y-0.5 mt-1 overflow-hidden">
+                      @for(emp of employeesToDisplay(); track emp.id) {
+                        @if(schedules().has(emp.id + '|' + day.dateStr)) {
+                          <div class="p-0.5 rounded-sm text-[10px] truncate"
+                              [class.bg-indigo-600]="selectedEmployeeIds().size > 0 || selectedEmployeeIds().has(emp.id)" [class.text-white]="selectedEmployeeIds().size > 0 || selectedEmployeeIds().has(emp.id)"
+                              [class.bg-indigo-100]="selectedEmployeeIds().size === 0 && !selectedEmployeeIds().has(emp.id)" [class.text-indigo-800]="selectedEmployeeIds().size === 0 && !selectedEmployeeIds().has(emp.id)"
+                              [class.dark:bg-indigo-500]="selectedEmployeeIds().size > 0 || selectedEmployeeIds().has(emp.id)"
+                              [class.dark:text-white]="selectedEmployeeIds().size > 0 || selectedEmployeeIds().has(emp.id)"
+                              [class.dark:bg-indigo-900/50]="selectedEmployeeIds().size === 0 && !selectedEmployeeIds().has(emp.id)" [class.dark:text-indigo-200]="selectedEmployeeIds().size === 0 && !selectedEmployeeIds().has(emp.id)"
+                              [title]="emp.first_name + ' ' + emp.last_name + ': ' + schedules().get(emp.id + '|' + day.dateStr)">
+                              {{ emp.first_name }}
+                          </div>
+                        }
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <!-- Daily Schedule Viewer Overlay -->
+              @if (viewingDay(); as day) {
+                <div class="absolute inset-0 z-10 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4" (click)="closeDayViewer()">
+                  <div class="w-full max-w-sm bg-white dark:bg-gray-800 rounded-lg shadow-xl animate-fade-in" (click)="$event.stopPropagation()">
+                    <div class="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+                      <h4 class="font-bold text-gray-900 dark:text-white">Schedules for {{ day.date | date:'longDate' }}</h4>
+                       <button (click)="closeDayViewer()" class="p-1 rounded-full text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                       </button>
+                    </div>
+                    <div class="p-4 max-h-60 overflow-y-auto">
+                      @if (employeesOnViewingDay().length > 0) {
+                        <ul class="space-y-2">
+                          @for (item of employeesOnViewingDay(); track item.emp.id) {
+                            <li class="flex justify-between items-center text-sm">
+                              <span class="text-gray-700 dark:text-gray-300">{{ item.emp.first_name }} {{ item.emp.last_name }}</span>
+                              <span class="font-semibold text-indigo-600 dark:text-indigo-400">{{ item.schedule }}</span>
+                            </li>
+                          }
+                        </ul>
+                      } @else {
+                        <p class="text-center text-sm text-gray-500 dark:text-gray-400">No employees scheduled for this day.</p>
+                      }
+                    </div>
+                    <div class="p-4 bg-gray-50 dark:bg-gray-900/50 border-t dark:border-gray-700 space-y-2">
+                       <p class="text-xs text-center text-gray-500 dark:text-gray-400">Apply or clear the selected schedule for the currently selected employees on this day.</p>
+                       <div class="flex gap-2">
+                          <button (click)="applyScheduleToDay(day.dateStr); closeDayViewer()" class="flex-1 text-center py-2 rounded-lg border-2 border-green-500 text-green-600 hover:bg-green-500 hover:text-white transition-colors text-sm font-medium">
+                              Apply Schedule
+                          </button>
+                          <button (click)="clearScheduleForDay(day.dateStr); closeDayViewer()" class="flex-1 text-center py-2 rounded-lg border-2 border-red-500 text-red-600 hover:bg-red-500 hover:text-white transition-colors text-sm font-medium">
+                              Clear Schedule
+                          </button>
+                       </div>
+                    </div>
+                  </div>
                 </div>
               }
             </div>
@@ -138,3 +201,14 @@
     </div>
   </div>
 }
+
+<style>
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+</style>

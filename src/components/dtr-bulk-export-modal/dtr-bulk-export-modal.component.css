@@ -1,0 +1,44 @@
+@media print {
+  /* Hide everything except the print area */
+  body * {
+    visibility: hidden;
+  }
+  .dtr-bulk-print-area, .dtr-bulk-print-area * {
+    visibility: visible;
+  }
+  .dtr-bulk-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 20px;
+    font-size: 10pt; /* Smaller font for printing */
+  }
+  .no-print {
+    display: none;
+  }
+
+  /* Ensure each employee DTR is on a new page */
+  .dtr-page-break {
+    page-break-after: always;
+  }
+
+  /* Ensure the table borders are visible when printing */
+  .dtr-table, .dtr-table th, .dtr-table td {
+    border: 1px solid black !important;
+    -webkit-print-color-adjust: exact; /* For Chrome */
+    color-adjust: exact; /* Standard */
+  }
+
+  .dtr-table th, .dtr-table td {
+     padding: 2px 4px; /* Tighter padding for print */
+  }
+  
+  /* Remove box shadow for printing */
+  .dtr-form-container {
+    box-shadow: none !important;
+    border: none !important;
+  }
+}

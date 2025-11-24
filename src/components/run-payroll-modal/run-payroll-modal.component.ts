@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, input, output, signal, computed, in
 import { FormsModule } from '@angular/forms';
 import { SupabaseService, Profile, DtrEntry, Payroll, SalaryRule, EmployeeSchedule, EmployeeStatus } from '../../services/supabase.service';
 import { CurrencyPipe, DatePipe } from '@angular/common';
+import { PayrollSettings } from '../admin-dashboard/admin-dashboard.component';
 
 interface PayrollPreview {
   employeeId: string;
@@ -26,16 +27,6 @@ interface PayrollPreview {
 
 type ModalState = 'preview' | 'loading' | 'success' | 'error';
 
-const GRACE_PERIOD_MINUTES = 15;
-const DEDUCTION_RATE_PER_MINUTE = 1.60;
-
-const BIRTH_MONTH_BONUS = {
-  'branch officer': 1200,
-  'team leader': 1000,
-  'regular staff': 500,
-} as const;
-
-
 @Component({
   selector: 'app-run-payroll-modal',
   templateUrl: './run-payroll-modal.component.html',
@@ -45,6 +36,7 @@ const BIRTH_MONTH_BONUS = {
 export class RunPayrollModalComponent {
   visible = input.required<boolean>();
   payPeriod = input<{start: Date, end: Date} | null>();
+  payrollSettings = input.required<PayrollSettings>();
   close = output<void>();
   payrollRun = output<void>();
   
@@ -114,6 +106,11 @@ export class RunPayrollModalComponent {
       
       const previews: PayrollPreview[] = [];
       
+      const settings = this.payrollSettings();
+      const deductionRatePerMinute = settings.late_rate_per_minute;
+      const gracePeriodMinutes = settings.grace_period_minutes;
+      const birthMonthBonuses = settings.birth_month_bonus;
+      
       for (const emp of employees) {
         if (!emp.id || !emp.daily_rate) continue;
         
@@ -157,42 +154,39 @@ export class RunPayrollModalComponent {
             dailyEntries.sort((a, b) => new Date(a.time_in!).getTime() - new Date(b.time_in!).getTime());
             
             let dailyWorkDurationMs = 0;
-            // First work period
-            if (dailyEntries[0]?.time_in && dailyEntries[0]?.time_out) {
-                dailyWorkDurationMs += new Date(dailyEntries[0].time_out).getTime() - new Date(dailyEntries[0].time_in).getTime();
-            }
+            const timeIn1 = dailyEntries[0]?.time_in ? new Date(dailyEntries[0].time_in) : null;
+            const timeOut1 = dailyEntries[0]?.time_out ? new Date(dailyEntries[0].time_out) : null;
+            const timeIn2 = dailyEntries[1]?.time_in ? new Date(dailyEntries[1].time_in) : null;
+            const timeOut2 = dailyEntries[1]?.time_out ? new Date(dailyEntries[1].time_out) : null;
+            
+            const expectedEnd = new Date(`${dateKey}T${schedule.work_end_time}+08:00`);
+            const ONE_HOUR_MS = 3600 * 1000;
 
-            // Second work period (after break)
-            if (dailyEntries[1]?.time_in) {
-                const timeIn2 = new Date(dailyEntries[1].time_in);
-                let timeOut2: Date | null = null;
-                
-                if (dailyEntries[1].time_out) {
-                    // Manual clock-out exists
-                    timeOut2 = new Date(dailyEntries[1].time_out);
-                } else {
-                    // Auto clock-out: use scheduled end time, as overtime is not paid
-                    timeOut2 = new Date(`${dateKey}T${schedule.work_end_time}+08:00`);
-                }
-
-                if (timeOut2) {
-                    dailyWorkDurationMs += Math.max(0, timeOut2.getTime() - timeIn2.getTime());
+            if (timeIn1 && !timeOut1 && !timeIn2 && !timeOut2) {
+                const effectiveWorkMs = expectedEnd.getTime() - timeIn1.getTime() - ONE_HOUR_MS;
+                dailyWorkDurationMs = Math.max(0, effectiveWorkMs);
+            } else {
+                if (timeIn1 && timeOut1) dailyWorkDurationMs += timeOut1.getTime() - timeIn1.getTime();
+                if (timeIn2 && timeOut2) {
+                    dailyWorkDurationMs += timeOut2.getTime() - timeIn2.getTime();
+                } else if (timeIn2 && !timeOut2) {
+                    dailyWorkDurationMs += Math.max(0, expectedEnd.getTime() - timeIn2.getTime());
                 }
             }
+
 
             const dailyWorkDurationHours = dailyWorkDurationMs / (1000 * 60 * 60);
             totalHoursInPeriod += dailyWorkDurationHours;
 
             const expectedStart = new Date(`${dateKey}T${schedule.work_start_time}+08:00`);
-            const expectedEnd = new Date(`${dateKey}T${schedule.work_end_time}+08:00`);
 
             const timeIn = new Date(dailyEntries[0].time_in!);
             const minutesLate = (timeIn.getTime() - expectedStart.getTime()) / (1000 * 60);
-            if (minutesLate > GRACE_PERIOD_MINUTES) {
+            if (minutesLate > gracePeriodMinutes) {
                 totalMinutesLate += Math.round(minutesLate);
             }
 
-            const requiredWorkHours = (expectedEnd.getTime() - expectedStart.getTime() - (3600 * 1000)) / (1000*60*60); // Assume 1-hour break
+            const requiredWorkHours = (expectedEnd.getTime() - expectedStart.getTime() - ONE_HOUR_MS) / (1000*60*60);
 
             if (dailyWorkDurationHours < requiredWorkHours) {
                  const undertimeHours = Math.max(0, requiredWorkHours - dailyWorkDurationHours);
@@ -220,8 +214,8 @@ export class RunPayrollModalComponent {
         
         baseGrossPay = (daysWorkedInPeriod + leaveDaysInPeriod) * emp.daily_rate;
 
-        const latenessDeductions = totalMinutesLate * DEDUCTION_RATE_PER_MINUTE;
-        const underTimeDeductions = totalMinutesUnderTime * DEDUCTION_RATE_PER_MINUTE;
+        const latenessDeductions = totalMinutesLate * deductionRatePerMinute;
+        const underTimeDeductions = totalMinutesUnderTime * deductionRatePerMinute;
 
         let birthMonthBonus = 0;
         if (emp.birth_date && emp.position) {
@@ -230,7 +224,7 @@ export class RunPayrollModalComponent {
             const payPeriodEndMonth = payrollEndDate.getUTCMonth();
 
             if (birthMonth === payPeriodStartMonth || birthMonth === payPeriodEndMonth) {
-                birthMonthBonus = BIRTH_MONTH_BONUS[emp.position as keyof typeof BIRTH_MONTH_BONUS] || 0;
+                birthMonthBonus = birthMonthBonuses[emp.position] || 0;
                 if (birthMonthBonus > 0) {
                     raiseDetails.push({ name: 'Birth Month Bonus', amount: birthMonthBonus });
                 }
@@ -315,33 +309,19 @@ export class RunPayrollModalComponent {
     try {
       const selectedPayrolls = this.payrollPreviews().filter(p => p.selected);
       
-      const payrollsToInsert = selectedPayrolls.map(p => {
-        const payrollData: any = {
-          user_id: p.employeeId,
-          pay_period_start: period.start.toISOString(),
-          pay_period_end: period.end.toISOString(),
-          total_hours: p.totalHours,
-          gross_pay: p.totalGrossPay,
-          salary_raise: p.salaryRaise,
-          lateness_minutes: p.totalMinutesLate,
-          undertime_minutes: p.totalMinutesUnderTime,
-          lateness_deductions: p.latenessDeductions,
-          undertime_deductions: p.underTimeDeductions,
-          manual_deductions: p.manualDeductions,
-          net_pay: p.netPay,
-          raise_details: p.raiseDetails,
-        };
-        
-        // --- FIX for recurring "early_departure_minutes" database error ---
-        // To prevent crashes from an out-of-sync database schema, we explicitly add
-        // default values for old, deprecated columns that might still have a
-        // NOT-NULL constraint in the user's database. The correct data is still
-        // saved in the 'undertime_minutes' and 'undertime_deductions' columns.
-        payrollData.early_departure_minutes = 0;
-        payrollData.early_departure_deductions = 0;
-        
-        return payrollData;
-      });
+      const payrollsToInsert = selectedPayrolls.map(p => ({
+        user_id: p.employeeId,
+        pay_period_start: period.start.toISOString(),
+        pay_period_end: period.end.toISOString(),
+        gross_pay: p.totalGrossPay,
+        lateness_minutes: p.totalMinutesLate,
+        undertime_minutes: p.totalMinutesUnderTime,
+        lateness_deductions: p.latenessDeductions,
+        undertime_deductions: p.underTimeDeductions,
+        manual_deductions: p.manualDeductions,
+        net_pay: p.netPay,
+        raise_details: p.raiseDetails,
+      }));
       
       if (payrollsToInsert.length === 0) {
         this.errorMessage.set('No employees selected to run payroll for.');

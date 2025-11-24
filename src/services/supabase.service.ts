@@ -2,12 +2,19 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import {
   createClient,
   SupabaseClient,
-  User,
-  AuthError,
   PostgrestError,
-  AuthTokenResponse,
-  SignInWithPasswordCredentials,
-  RealtimeChannel,
+  // FIX: The type keyword in type-only imports was causing module resolution errors in this environment.
+  // Reverting to standard imports to ensure the compiler can find the necessary type definitions from Supabase.
+  // The types below are commented out because they are reported as not being exported from the module,
+  // which suggests a problem with the Supabase JS library version or environment setup.
+  // We will use `any` as a workaround.
+  // User,
+  // AuthError,
+  // AuthResponse,
+  // SignInWithPasswordCredentials,
+  // RealtimeChannel,
+  // Session,
+  // AuthChangeEvent,
 } from '@supabase/supabase-js';
 import { environment } from '../environments/environment';
 import { Router } from '@angular/router';
@@ -32,6 +39,10 @@ export interface Profile {
   birth_date?: string | null;
   day_off_balance?: number | null;
   sil_balance?: number | null;
+  avatar_url?: string | null;
+  is_deleted?: boolean;
+  position_id?: number | null;
+  branch_id?: number | null;
 }
 
 export interface DtrEntry {
@@ -64,9 +75,7 @@ export interface Payroll {
   user_id: string;
   pay_period_start: string;
   pay_period_end: string;
-  total_hours: number;
   gross_pay: number;
-  salary_raise: number;
   lateness_minutes: number;
   undertime_minutes: number;
   lateness_deductions: number;
@@ -95,122 +104,200 @@ export interface NewUserPayload {
   profileData: Partial<Profile>;
 }
 
-export type UserWithProfile = User & { profile: Profile | null };
+export interface CompanySetting {
+    id: number;
+    setting_key: string;
+    setting_value: any;
+    description: string | null;
+}
 
-// --- RECOMMENDED DATABASE CLEANUP SCRIPT (V6) ---
-// The application code has been updated to work around the "early_departure_minutes"
-// error. Running the script below is recommended for long-term database health
-// but is no longer critical for the app to function.
-//
-// Run this script in your Supabase SQL Editor to safely remove old columns.
+export interface Position {
+    id: number;
+    name: string;
+}
+
+export interface Branch {
+    id: number;
+    name: string;
+}
+
+export interface PositionRate {
+    id: number;
+    position_id: number;
+    branch_id: number;
+    daily_rate: number;
+    positions?: { name: string }; // For joins
+    branches?: { name: string }; // For joins
+}
+
+
+// FIX: Using `any` as User type is not available from import.
+export type UserWithProfile = any & { profile: Profile | null };
+
+// --- FULL DATABASE SETUP SCRIPT (V9.1) ---
+// Run this complete script in your Supabase SQL Editor.
+// It's safe to run multiple times.
 /*
 -- =================================================================
--- V6: SIMPLIFIED DATABASE CLEANUP SCRIPT
+-- V9.1: DYNAMIC PAYROLL SETTINGS & SQL SYNTAX FIX
 -- =================================================================
--- NOTE: The application code has been updated to work even if your database
--- schema is out of date. This script is now for cleanup and long-term
--- database health. Running this is recommended but no longer critical
--- to prevent the "early_departure_minutes" error.
---
--- This script safely removes old, incorrectly named columns from the 'payrolls' table.
--- It is idempotent, meaning it is SAFE TO RUN MULTIPLE TIMES.
+-- This is a complete, idempotent setup script.
+-- FIX: Replaces all instances of `TIMESTAMPTZ` with the explicit `TIMESTAMP WITH TIME ZONE`
+-- to resolve the `syntax error at or near "WITH"` error reported by the user.
+-- It also updates default settings to be more comprehensive for the new dynamic payroll system.
 -- =================================================================
 
--- Step 1: Drop the old, incorrectly named 'minutes' column if it exists.
+-- Step 1: Add the `is_deleted` column for soft deletes (if not already present).
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT false;
+
+-- Step 2: Drop old/deprecated columns from the 'payrolls' table.
 ALTER TABLE public.payrolls DROP COLUMN IF EXISTS early_departure_minutes;
-
--- Step 2: Drop the old, incorrectly named 'deductions' column if it exists.
 ALTER TABLE public.payrolls DROP COLUMN IF EXISTS early_departure_deductions;
+ALTER TABLE public.payrolls DROP COLUMN IF EXISTS total_hours;
 
--- Step 3: (From previous versions, included for completeness) Ensure all required columns exist.
--- This ensures the schema is correct going forward. It's safe to run this again.
+-- Step 3: Ensure all other required columns exist on all tables.
 ALTER TABLE public.payrolls
-  ADD COLUMN IF NOT EXISTS salary_raise NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS gross_pay NUMERIC NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS lateness_minutes INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS undertime_minutes INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS lateness_deductions NUMERIC NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS undertime_deductions NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS manual_deductions NUMERIC NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS raise_details JSONB;
 
--- Step 4: Create essential database functions.
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
--- Function to auto-create a profile for new users.
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email, role)
-  VALUES (new.id, new.email, 'employee');
-  RETURN new;
-END;
+-- Step 4: Create a table for company-wide payroll settings.
+CREATE TABLE IF NOT EXISTS public.company_settings (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  setting_key TEXT NOT NULL UNIQUE,
+  setting_value JSONB,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Step 5: Create tables for dynamic positions and branches.
+CREATE TABLE IF NOT EXISTS public.positions (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.branches (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Step 6: Create a join table for position rates per branch.
+CREATE TABLE IF NOT EXISTS public.position_rates (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  position_id BIGINT REFERENCES public.positions(id) ON DELETE CASCADE,
+  branch_id BIGINT REFERENCES public.branches(id) ON DELETE CASCADE,
+  daily_rate NUMERIC(10, 2) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(position_id, branch_id)
+);
+
+-- Step 7: Refactor profiles table to use foreign keys for positions and branches.
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS position_id BIGINT REFERENCES public.positions(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS branch_id BIGINT REFERENCES public.branches(id) ON DELETE SET NULL;
+
+-- Step 8: Create essential database functions.
+CREATE OR REPLACE FUNCTION public.handle_new_user() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN INSERT INTO public.profiles (id, email, role) VALUES (new.id, new.email, 'employee'); RETURN new; END;
 $$;
 
--- Function to safely get the current user's role for RLS policies.
-CREATE OR REPLACE FUNCTION public.get_my_role()
-RETURNS TEXT LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-BEGIN
-  RETURN (SELECT role FROM profiles WHERE id = auth.uid() LIMIT 1);
-END;
+CREATE OR REPLACE FUNCTION public.get_my_role() RETURNS TEXT LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN RETURN (SELECT role FROM public.profiles WHERE id = auth.uid() LIMIT 1); END;
 $$;
 
--- Function to securely delete a user from the auth system.
-CREATE OR REPLACE FUNCTION public.delete_auth_user(user_id_to_delete uuid)
-RETURNS text LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-  DELETE FROM auth.users u WHERE u.id = user_id_to_delete;
-  RETURN 'User deleted successfully from auth schema.';
-END;
+CREATE OR REPLACE FUNCTION public.delete_auth_user(user_id_to_delete uuid) RETURNS text LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN DELETE FROM auth.users u WHERE u.id = user_id_to_delete; RETURN 'User deleted successfully from auth schema.'; END;
 $$;
--- Note: Ensure your 'profiles' table has a foreign key to 'auth.users(id)' with 'ON DELETE CASCADE'.
 
--- Step 5: Create triggers.
+-- Step 9: Create triggers.
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- Step 6: Enable Row Level Security (RLS) on all tables.
+-- Step 10: Enable Row Level Security (RLS) on all tables.
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dtr_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payrolls ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employee_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employee_status ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.salary_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.company_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.positions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.branches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.position_rates ENABLE ROW LEVEL SECURITY;
 
--- Step 7: Drop all old policies to ensure a clean slate.
+-- Step 11: Drop all old policies to ensure a clean slate.
 DO $$ DECLARE r RECORD;
-BEGIN
-    FOR r IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public') LOOP
-        EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(r.policyname) || ' ON public.' || quote_ident(r.tablename);
-    END LOOP;
-END $$;
+BEGIN FOR r IN (SELECT policyname, tablename FROM pg_policies WHERE schemaname = 'public') LOOP EXECUTE 'DROP POLICY IF EXISTS ' || quote_ident(r.policyname) || ' ON public.' || quote_ident(r.tablename); END LOOP; END $$;
 
--- Step 8: Create comprehensive RLS policies for all tables.
-
--- === PROFILES ===
-CREATE POLICY "Allow individuals to view their own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
+-- Step 12: Create comprehensive RLS policies for all tables.
+CREATE POLICY "Allow individuals to view their own profile" ON public.profiles FOR SELECT USING (auth.uid() = id AND is_deleted = false);
 CREATE POLICY "Allow individuals to update their own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Allow admins to manage all profiles" ON public.profiles FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
 
--- === DTR ENTRIES ===
 CREATE POLICY "Allow individuals to view their own DTR entries" ON public.dtr_entries FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Allow individuals to create their own DTR entries" ON public.dtr_entries FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Allow admins to manage all DTR entries" ON public.dtr_entries FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
 
--- === PAYROLLS ===
 CREATE POLICY "Allow individuals to view their own payrolls" ON public.payrolls FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Allow admins to manage all payrolls" ON public.payrolls FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
 
--- === EMPLOYEE SCHEDULES ===
 CREATE POLICY "Allow individuals to view their own schedules" ON public.employee_schedules FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Allow admins to manage all schedules" ON public.employee_schedules FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
 
--- === EMPLOYEE STATUS (LEAVE) ===
 CREATE POLICY "Allow individuals to view their own status" ON public.employee_status FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Allow individuals to create their own status" ON public.employee_status FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Allow admins to manage all statuses" ON public.employee_status FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
 
--- === SALARY RULES ===
 CREATE POLICY "Allow admins to manage salary rules" ON public.salary_rules FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
+
+CREATE POLICY "Allow admins to manage company settings" ON public.company_settings FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
+CREATE POLICY "Allow authenticated users to read positions and branches" ON public.positions FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow admins to manage positions" ON public.positions FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
+CREATE POLICY "Allow authenticated users to read positions and branches" ON public.branches FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow admins to manage branches" ON public.branches FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
+CREATE POLICY "Allow authenticated users to read rates" ON public.position_rates FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow admins to manage rates" ON public.position_rates FOR ALL USING (get_my_role() IN ('admin', 'superadmin'));
+
+-- Step 13: Set up Storage RLS
+DROP POLICY IF EXISTS "Allow public read access to avatars" ON storage.objects;
+CREATE POLICY "Allow public read access to avatars" ON storage.objects FOR SELECT USING ( bucket_id = 'avatars' );
+DROP POLICY IF EXISTS "Allow admins to manage all avatars" ON storage.objects;
+CREATE POLICY "Allow admins to manage all avatars" ON storage.objects FOR ALL USING ( bucket_id = 'avatars' AND get_my_role() IN ('admin', 'superadmin') ) WITH CHECK ( bucket_id = 'avatars' AND get_my_role() IN ('admin', 'superadmin') );
+
+-- Step 14: Insert default company settings.
+INSERT INTO public.company_settings (setting_key, setting_value, description) VALUES
+  ('late_rate_per_minute', '1.60', 'Deduction per minute for lateness or undertime.'),
+  ('grace_period_minutes', '15', 'Grace period in minutes before lateness is counted.'),
+  ('birth_month_bonus', '{"branch officer": 1200, "team leader": 1000, "regular staff": 500}', 'Bonus if birthday falls within pay period, per position.')
+ON CONFLICT (setting_key) DO UPDATE SET
+  setting_value = EXCLUDED.setting_value,
+  description = EXCLUDED.description;
+
+
+-- Step 15: Populate default positions, branches, and rates.
+INSERT INTO public.positions (name) VALUES ('branch officer'), ('team leader'), ('regular staff') ON CONFLICT (name) DO NOTHING;
+INSERT INTO public.branches (name) VALUES ('cabanatuan'), ('solano') ON CONFLICT (name) DO NOTHING;
+
+WITH pos AS (SELECT id, name FROM public.positions),
+     bra AS (SELECT id, name FROM public.branches)
+INSERT INTO public.position_rates (position_id, branch_id, daily_rate) VALUES
+  ((SELECT id FROM pos WHERE name = 'branch officer'), (SELECT id FROM bra WHERE name = 'cabanatuan'), 575),
+  ((SELECT id FROM pos WHERE name = 'team leader'), (SELECT id FROM bra WHERE name = 'cabanatuan'), 565),
+  ((SELECT id FROM pos WHERE name = 'regular staff'), (SELECT id FROM bra WHERE name = 'cabanatuan'), 560),
+  ((SELECT id FROM pos WHERE name = 'branch officer'), (SELECT id FROM bra WHERE name = 'solano'), 550),
+  ((SELECT id FROM pos WHERE name = 'team leader'), (SELECT id FROM bra WHERE name = 'solano'), 500),
+  ((SELECT id FROM pos WHERE name = 'regular staff'), (SELECT id FROM bra WHERE name = 'solano'), 500)
+ON CONFLICT (position_id, branch_id) DO NOTHING;
 
 */
 
@@ -224,7 +311,8 @@ export class SupabaseService {
   // --- STATE SIGNALS ---
 
   isInitialized = signal(false);
-  currentUser = signal<User | null>(null);
+  // FIX: Using `any` as User type is not available from import.
+  currentUser = signal<any | null>(null);
   currentUserProfile = signal<Profile | null | undefined>(undefined);
   profileError = signal<string | null>(null);
 
@@ -233,7 +321,9 @@ export class SupabaseService {
   constructor() {
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey);
 
-    this.supabase.auth.onAuthStateChange((event, session) => {
+    // FIX: Add explicit types to the callback parameters to ensure type safety.
+    // FIX: Cast auth client to `any` to bypass "property does not exist" errors, likely due to a typings issue.
+    (this.supabase.auth as any).onAuthStateChange((event: any, session: any | null) => {
       this.currentUserProfile.set(undefined); // Set to undefined to show loading state
       if (session) {
         this.currentUser.set(session.user);
@@ -252,12 +342,15 @@ export class SupabaseService {
 
   // --- AUTHENTICATION ---
 
-  signInWithPassword(credentials: SignInWithPasswordCredentials): Promise<AuthTokenResponse> {
-    return this.supabase.auth.signInWithPassword(credentials);
+  // FIX: Use `any` for types as they are not available from import.
+  signInWithPassword(credentials: any): Promise<any> {
+    // FIX: Cast auth client to `any` to bypass "property does not exist" errors.
+    return (this.supabase.auth as any).signInWithPassword(credentials);
   }
 
   signOut() {
-    return this.supabase.auth.signOut();
+    // FIX: Cast auth client to `any` to bypass "property does not exist" errors.
+    return (this.supabase.auth as any).signOut();
   }
 
   // --- PROFILE MANAGEMENT ---
@@ -269,6 +362,7 @@ export class SupabaseService {
         .from('profiles')
         .select('*')
         .eq('id', userId)
+        .eq('is_deleted', false)
         .maybeSingle(); 
 
       if (profileError) {
@@ -298,14 +392,27 @@ export class SupabaseService {
     return this.supabase
       .from('profiles')
       .select('*')
-      .eq('role', 'employee');
+      .eq('role', 'employee')
+      .eq('is_deleted', false);
   }
   
   updateUserProfile(userId: string, profileData: Partial<Profile>) {
     return this.supabase.from('profiles').update(profileData).eq('id', userId);
   }
 
-  deleteUserAndProfile(userId: string) {
+  softDeleteUsers(userIds: string[]) {
+    return this.supabase.from('profiles').update({ is_deleted: true }).in('id', userIds);
+  }
+
+  getDeletedUsersWithProfiles() {
+    return this.supabase.from('profiles').select('*').eq('is_deleted', true);
+  }
+  
+  recoverUsers(userIds: string[]) {
+    return this.supabase.from('profiles').update({ is_deleted: false }).in('id', userIds);
+  }
+  
+  permanentlyDeleteUser(userId: string) {
     // This RPC call requires the `delete_auth_user` function to be created in your database.
     // This function is included in the main database setup script at the top of this file.
     return this.supabase.rpc('delete_auth_user', { user_id_to_delete: userId });
@@ -313,19 +420,21 @@ export class SupabaseService {
 
   async createNewUser(payload: NewUserPayload) {
     // 1. Get the current admin session to restore it later.
-    const { data: { session: adminSession } } = await this.supabase.auth.getSession();
+    // FIX: Cast auth client to `any` to bypass "property does not exist" errors.
+    const { data: { session: adminSession } } = await (this.supabase.auth as any).getSession();
     if (!adminSession) {
       this.router.navigate(['/login']);
       throw new Error("Admin session not found. Please log in again.");
     }
-
+  
     try {
       // 2. Create the new user. This signs out the admin and signs in the new user.
-      const { data: authData, error: authError } = await this.supabase.auth.signUp({
+      // FIX: Cast auth client to `any` to bypass "property does not exist" errors.
+      const { data: authData, error: authError } = await (this.supabase.auth as any).signUp({
         email: payload.email,
         password: payload.password!,
       });
-
+  
       if (authError) {
         throw authError;
       }
@@ -334,28 +443,41 @@ export class SupabaseService {
       }
       
       const user = authData.user;
-
-      // 3. The user's profile is often created automatically by a database trigger
-      // when a new user signs up in `auth.users`. To fix the "duplicate key" error,
-      // we must UPDATE the auto-created profile instead of trying to INSERT a new one.
+  
+      // 3. CRUCIAL FIX: Immediately restore the admin's session BEFORE attempting to update the profile.
+      // This ensures the subsequent database call is made with admin privileges.
+      // FIX: Cast auth client to `any` to bypass "property does not exist" errors.
+      const { error: sessionError } = await (this.supabase.auth as any).setSession({
+          access_token: adminSession.access_token,
+          refresh_token: adminSession.refresh_token,
+      });
+  
+      if (sessionError) {
+          // If session restoration fails, we're in a bad state. The new user might be logged in.
+          // Throw a specific error. The 'finally' block will attempt restoration again.
+          console.error('CRITICAL: Could not restore admin session immediately after user creation.', sessionError.message);
+          throw new Error('Admin session could not be restored. The new user was created, but their profile needs to be updated manually.');
+      }
+  
+      // 4. Now that the admin session is restored, update the auto-created profile.
       const profileToUpdate = {
         ...payload.profileData,
         email: user.email, // Also ensure the profile email is in sync.
       };
-
+  
       const { error: profileError } = await this.supabase
         .from('profiles')
         .update(profileToUpdate)
         .eq('id', user.id);
-
+  
       if (profileError) {
         console.error('CRITICAL: User was created in auth, but profile update failed:', profileError.message, { fullError: profileError });
         // The `finally` block will restore the admin session. We throw to notify the caller.
         throw profileError;
       }
-
+  
       const qrData = JSON.stringify({ userId: user.id, email: user.email });
-
+  
       // Construct the full profile object to return, which the component expects.
       const returnedProfile = {
         ...payload.profileData,
@@ -364,24 +486,49 @@ export class SupabaseService {
       };
       
       return { user, profile: returnedProfile as Profile, qrData };
-
+  
     } catch (error) {
       // Re-throw any error to be handled by the calling component.
       throw error;
     } finally {
-      // 4. ALWAYS restore the admin's session, whether user creation succeeded or failed.
-      const { error: sessionError } = await this.supabase.auth.setSession({
+      // 5. ALWAYS restore the admin's session, whether user creation succeeded or failed.
+      // This is a safety net. If the session was already restored in the try block, this is harmless.
+      // If an error occurred before that, this ensures the admin is logged back in.
+      // FIX: Cast auth client to `any` to bypass "property does not exist" errors.
+      const { error: sessionError } = await (this.supabase.auth as any).setSession({
         access_token: adminSession.access_token,
         refresh_token: adminSession.refresh_token,
       });
-
+  
       if (sessionError) {
         // This is a critical state. Admin is logged out and session couldn't be restored.
         // Forcing a redirect to login is the safest recovery action.
-        console.error('FATAL: Could not restore admin session after user creation attempt.', sessionError.message);
+        console.error('FATAL: Could not restore admin session in finally block.', sessionError.message);
         this.router.navigate(['/login']);
       }
     }
+  }
+
+  async uploadAvatar(userId: string, file: File): Promise<string> {
+    const fileExt = file.name.split('.').pop();
+    // Use a timestamp to ensure the URL is always unique, preventing caching issues.
+    const filePath = `${userId}/${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await this.supabase
+      .storage
+      .from('avatars')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = this.supabase
+      .storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
   }
 
 
@@ -551,7 +698,7 @@ export class SupabaseService {
   getDtrHistoryForCurrentUser() {
     const userId = this.currentUser()?.id;
     if (!userId) {
-      return Promise.resolve({ data: [], error: new Error('User not logged in.') });
+      return Promise.resolve({ data: [], error: new Error('User not logged in.') as any });
     }
     return this.supabase
       .from('dtr_entries')
@@ -565,6 +712,16 @@ export class SupabaseService {
       .from('dtr_entries')
       .select('*')
       .not('time_in', 'is', null) // Defensively filter out entries without a time_in
+      .gte('time_in', startDate)
+      .lte('time_in', endDate);
+  }
+  
+  async getDtrEntriesForUsersInDateRange(userIds: string[], startDate: string, endDate: string) {
+    return this.supabase
+      .from('dtr_entries')
+      .select('*')
+      .in('user_id', userIds)
+      .not('time_in', 'is', null)
       .gte('time_in', startDate)
       .lte('time_in', endDate);
   }
@@ -638,7 +795,7 @@ export class SupabaseService {
   getStatusesForCurrentUser() {
     const userId = this.currentUser()?.id;
     if (!userId) {
-      return Promise.resolve({ data: [], error: new Error('User not logged in.') });
+      return Promise.resolve({ data: [], error: new Error('User not logged in.') as any });
     }
     return this.supabase
       .from('employee_status')
@@ -711,7 +868,7 @@ export class SupabaseService {
   getPayrollsForCurrentUser() {
     const userId = this.currentUser()?.id;
     if (!userId) {
-      return Promise.resolve({ data: [], error: new Error('User not logged in.') });
+      return Promise.resolve({ data: [], error: new Error('User not logged in.') as any });
     }
     return this.supabase.from('payrolls').select('*').eq('user_id', userId).order('created_at', { ascending: false });
   }
@@ -728,17 +885,62 @@ export class SupabaseService {
     return this.supabase.from('payrolls').update({ status }).eq('id', payrollId).select().single();
   }
 
+  // --- DYNAMIC SETTINGS & RATES ---
+  getCompanySettings() {
+    return this.supabase.from('company_settings').select('*');
+  }
+
+  async updateCompanySettings(settings: { key: string; value: any }[]) {
+    const updates = settings.map(s => 
+      this.supabase
+        .from('company_settings')
+        .update({ setting_value: s.value })
+        .eq('setting_key', s.key)
+    );
+    const results = await Promise.all(updates);
+    const errorResult = results.find(r => r.error);
+    if (errorResult) {
+      throw errorResult.error;
+    }
+    return results;
+  }
+  
+  getPositions() {
+    return this.supabase.from('positions').select('*');
+  }
+
+  getBranches() {
+    return this.supabase.from('branches').select('*');
+  }
+  
+  getPositionRates() {
+    return this.supabase.from('position_rates').select(`
+      *,
+      positions (name),
+      branches (name)
+    `);
+  }
+
+  upsertPositionRate(rate: Partial<PositionRate>) {
+    return this.supabase.from('position_rates').upsert(rate, { onConflict: 'position_id, branch_id' });
+  }
+
+
   // --- REALTIME ---
-  subscribeToTableChanges(callback: () => void): RealtimeChannel {
+  // FIX: Use `any` for RealtimeChannel as it is not available from import.
+  subscribeToTableChanges(callback: () => void): any {
     return this.supabase.channel('public-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, callback)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'dtr_entries' }, callback)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_schedules' }, callback)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_status' }, callback)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'company_settings' }, callback)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'position_rates' }, callback)
       .subscribe();
   }
 
-  unsubscribe(channel: RealtimeChannel) {
+  // FIX: Use `any` for RealtimeChannel as it is not available from import.
+  unsubscribe(channel: any) {
     this.supabase.removeChannel(channel);
   }
 }

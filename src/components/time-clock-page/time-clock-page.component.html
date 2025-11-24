@@ -1,0 +1,88 @@
+<div class="w-screen h-screen bg-gray-900 flex flex-col items-center justify-center p-4 antialiased">
+  <div class="w-full max-w-3xl mx-auto">
+    <!-- Header -->
+    <div class="text-center mb-4">
+      <h1 class="text-3xl font-bold text-white tracking-wider">Jelene Trading Time Clock</h1>
+      <p class="text-gray-400">Point your employee QR code at the camera</p>
+    </div>
+
+    <!-- Scanner Area -->
+    <div class="relative w-full aspect-[4/3] bg-black rounded-2xl shadow-2xl overflow-hidden border-4 border-gray-700">
+      <video #video class="w-full h-full object-cover"></video>
+      <canvas #canvas class="hidden"></canvas>
+
+      <!-- Loading Spinner -->
+      @if (scannerLoading()) {
+        <div class="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <svg class="animate-spin h-12 w-12 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        </div>
+      }
+
+      <!-- Error Message -->
+      @if (scannerErrorMessage()) {
+        <div class="absolute inset-0 flex flex-col items-center justify-center bg-red-900/90 text-white p-8 text-center animate-fade-in">
+          <div class="w-16 h-16 bg-red-500/30 rounded-full flex items-center justify-center mb-4 ring-4 ring-red-500/50">
+             <svg class="w-8 h-8 text-red-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+          </div>
+          <h3 class="text-3xl font-bold">Scan Error</h3>
+          <p class="mt-2 text-lg text-red-200">{{ scannerErrorMessage() }}</p>
+        </div>
+      }
+
+      <!-- Success Result -->
+      @if (lastScanResult(); as result) {
+        <div class="absolute inset-0 flex items-center justify-center bg-gray-900/80 backdrop-blur-md p-4 animate-fade-in">
+          <div class="w-full max-w-md p-8 rounded-2xl shadow-2xl text-center border-2"
+            [class.border-green-500]="result.status === 'CLOCK_IN_WORK' || result.status === 'CLOCK_IN_BREAK'"
+            [class.border-yellow-500]="result.status === 'CLOCK_OUT_BREAK'"
+            [class.border-blue-500]="result.status === 'CLOCK_OUT_DAY'"
+          >
+            <!-- Avatar -->
+            @if(result.profile.avatar_url) {
+              <img [src]="result.profile.avatar_url" alt="Profile picture" class="w-32 h-32 rounded-full mx-auto object-cover ring-4 ring-offset-4 ring-offset-gray-900"
+                [class.ring-green-500]="result.status === 'CLOCK_IN_WORK' || result.status === 'CLOCK_IN_BREAK'"
+                [class.ring-yellow-500]="result.status === 'CLOCK_OUT_BREAK'"
+                [class.ring-blue-500]="result.status === 'CLOCK_OUT_DAY'"
+              >
+            } @else {
+              <div class="w-32 h-32 rounded-full mx-auto bg-gray-700 flex items-center justify-center ring-4 ring-offset-4 ring-offset-gray-900"
+                [class.ring-gray-500]="true">
+                  <svg class="h-24 w-24 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M24 20.993V24H0v-2.993A1 1 0 001 18h22a1 1 0 001 2.993zM12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z"></path>
+                  </svg>
+              </div>
+            }
+
+            <!-- Employee Info -->
+            <h2 class="mt-6 text-4xl font-extrabold text-white">{{ result.profile.first_name }} {{ result.profile.last_name }}</h2>
+            
+            <!-- Status Message -->
+            @switch(result.status) {
+              @case('CLOCK_IN_WORK') {
+                <p class="mt-2 text-xl font-medium text-green-300">Timed In for Work</p>
+              }
+              @case('CLOCK_OUT_BREAK') {
+                <p class="mt-2 text-xl font-medium text-yellow-300">Started Break</p>
+                <p class="mt-4 text-4xl font-mono tracking-widest text-white">{{ breakCountdownDisplay() }}</p>
+              }
+              @case('CLOCK_IN_BREAK') {
+                <p class="mt-2 text-xl font-medium text-green-300">Resumed Work</p>
+              }
+              @case('CLOCK_OUT_DAY') {
+                <p class="mt-2 text-xl font-medium text-blue-300">Timed Out for the Day</p>
+              }
+            }
+            
+            <!-- Time & Date -->
+            <div class="mt-8 bg-gray-800/50 rounded-lg p-4">
+              <p class="text-4xl font-bold text-white">{{ result.scanTime | date:'h:mm:ss a' }}</p>
+              <p class="text-lg text-gray-400">{{ result.scanTime | date:'fullDate' }}</p>
+            </div>
+
+          </div>
+        </div>
+      }
+
+    </div>
+  </div>
+</div>

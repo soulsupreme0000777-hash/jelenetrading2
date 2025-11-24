@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, inject, computed, effect } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, inject, computed, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SupabaseService, Profile, EmployeeSchedule } from '../../services/supabase.service';
@@ -12,6 +12,7 @@ interface CalendarDay {
   isCurrentMonth: boolean;
   isToday: boolean;
   isWeekend: boolean;
+  isPast: boolean;
 }
 
 const SCHEDULE_TEMPLATES = {
@@ -50,6 +51,7 @@ export class SetScheduleModalComponent {
   // Selection State
   selectedEmployeeIds = signal(new Set<string>());
   selectedSchedule = signal<ScheduleTemplateKey>(this.scheduleTemplates[0]);
+  viewingDay = signal<CalendarDay | null>(null);
 
   // Data State
   schedules = signal<Map<string, ScheduleTemplateKey>>(new Map()); // Key: 'userId|dateStr'
@@ -60,14 +62,56 @@ export class SetScheduleModalComponent {
     return employees.length > 0 && this.selectedEmployeeIds().size === employees.length;
   });
 
+  employeesOnViewingDay = computed(() => {
+    const day = this.viewingDay();
+    if (!day) return [];
+    
+    return this.employees()
+        .map(emp => {
+            const scheduleKey = `${emp.id}|${day.dateStr}`;
+            const schedule = this.schedules().get(scheduleKey);
+            return { emp, schedule };
+        })
+        .filter((item): item is { emp: Profile; schedule: ScheduleTemplateKey } => !!item.schedule);
+  });
+  
+  /**
+   * Provides a list of employees whose schedules should be rendered on the calendar.
+   * If any employees are selected in the side panel, it returns only those employees (Focus Mode).
+   * If no employees are selected, it returns all employees.
+   */
+  employeesToDisplay = computed(() => {
+    const selectedIds = this.selectedEmployeeIds();
+    if (selectedIds.size > 0) {
+      return this.employees().filter(emp => selectedIds.has(emp.id));
+    }
+    return this.employees();
+  });
+
   constructor() {
+    // This effect is for data loading and calendar generation. It runs when the
+    // month/year (currentDate) or the list of employees changes.
     effect(() => {
-      if (this.visible()) {
-        // Reset to current PST month when modal opens for consistency
-        this.currentDate.set(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })));
+      // We only want this to run when the modal is actually visible.
+      if (!this.visible()) return;
+
+      // By reading these signals, we establish them as dependencies for this effect.
+      this.currentDate();
+      this.employees();
+
+      // We use untracked to prevent creating a dependency loop. The primary dependencies
+      // are established above. This block will run when they change.
+      untracked(() => {
         this.generateCalendar();
         this.loadSchedulesForMonth();
-      } else {
+      });
+    });
+
+    // This effect is ONLY for initializing the modal when it opens.
+    effect(() => {
+      if (this.visible()) {
+        // When the modal becomes visible, reset its state. This sets the
+        // calendar to the current month and will trigger the data loading effect above.
         this.resetState();
       }
     });
@@ -78,8 +122,6 @@ export class SetScheduleModalComponent {
     const year = viewingDate.getFullYear();
     const month = viewingDate.getMonth();
 
-    // Use LOCAL date parts from our PST-based date to construct UTC dates.
-    // This prevents the user's local timezone from interfering with calendar generation.
     const firstDayOfMonth = new Date(Date.UTC(year, month, 1));
     const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0));
     
@@ -94,14 +136,16 @@ export class SetScheduleModalComponent {
     const days: CalendarDay[] = [];
     let dayIterator = new Date(startDate);
     
-    // --- DEFINITIVE FIX: Use Intl.DateTimeFormat for robust, standards-based timezone handling. ---
     const timeZone = 'Asia/Manila';
+    const nowPST = new Date(new Date().toLocaleString('en-US', { timeZone }));
+    const todayPST = new Date(nowPST.getFullYear(), nowPST.getMonth(), nowPST.getDate());
+
     const parts = new Intl.DateTimeFormat('en-US', {
         timeZone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
-    }).formatToParts(new Date());
+    }).formatToParts(nowPST);
 
     const yearToday = parts.find(p => p.type === 'year')!.value;
     const monthToday = parts.find(p => p.type === 'month')!.value;
@@ -110,10 +154,9 @@ export class SetScheduleModalComponent {
 
 
     while (dayIterator <= endDate) {
-      // The iterator is built from UTC components, so its ISO string's date part
-      // correctly represents the date in our target timezone (PST).
       const dateStr = dayIterator.toISOString().slice(0, 10);
       const dayOfWeek = dayIterator.getUTCDay();
+      const isPast = dayIterator < todayPST;
       
       days.push({
         date: new Date(dayIterator),
@@ -122,6 +165,7 @@ export class SetScheduleModalComponent {
         isCurrentMonth: dayIterator.getUTCMonth() === month,
         isToday: dateStr === todayPstStr,
         isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+        isPast: isPast,
       });
       dayIterator.setUTCDate(dayIterator.getUTCDate() + 1);
     }
@@ -136,8 +180,13 @@ export class SetScheduleModalComponent {
       return;
     }
 
-    const firstDay = this.calendarDays()[0].dateStr;
-    const lastDay = this.calendarDays().slice(-1)[0].dateStr;
+    const firstDay = this.calendarDays()[0]?.dateStr;
+    const lastDay = this.calendarDays().slice(-1)[0]?.dateStr;
+    
+    if (!firstDay || !lastDay) {
+        this.modalState.set('loaded'); // Calendar not ready yet
+        return;
+    }
 
     try {
       const { data, error } = await this.supabaseService.getSchedulesForDateRange(
@@ -189,7 +238,10 @@ export class SetScheduleModalComponent {
   }
 
   applyScheduleToDay(dateStr: string): void {
+    const day = this.calendarDays().find(d => d.dateStr === dateStr);
+    if (day?.isPast) return;
     if (this.selectedEmployeeIds().size === 0) return;
+
     this.schedules.update(currentMap => {
       const newMap = new Map(currentMap);
       this.selectedEmployeeIds().forEach(userId => {
@@ -201,8 +253,11 @@ export class SetScheduleModalComponent {
   }
   
   clearScheduleForDay(dateStr: string): void {
-     if (this.selectedEmployeeIds().size === 0) return;
-     this.schedules.update(currentMap => {
+    const day = this.calendarDays().find(d => d.dateStr === dateStr);
+    if (day?.isPast) return;
+    if (this.selectedEmployeeIds().size === 0) return;
+    
+    this.schedules.update(currentMap => {
       const newMap = new Map(currentMap);
       this.selectedEmployeeIds().forEach(userId => {
         const key = `${userId}|${dateStr}`;
@@ -218,7 +273,7 @@ export class SetScheduleModalComponent {
     this.schedules.update(currentMap => {
       const newMap = new Map(currentMap);
       this.calendarDays().forEach(day => {
-        if (day.isCurrentMonth && !day.isWeekend) {
+        if (day.isCurrentMonth && !day.isWeekend && !day.isPast) {
           this.selectedEmployeeIds().forEach(userId => {
             newMap.set(`${userId}|${day.dateStr}`, scheduleKey);
           });
@@ -280,8 +335,6 @@ export class SetScheduleModalComponent {
       newDate.setMonth(newDate.getMonth() - 1);
       return newDate;
     });
-    this.generateCalendar();
-    this.loadSchedulesForMonth();
   }
 
   nextMonth(): void {
@@ -290,8 +343,15 @@ export class SetScheduleModalComponent {
       newDate.setMonth(newDate.getMonth() + 1);
       return newDate;
     });
-    this.generateCalendar();
-    this.loadSchedulesForMonth();
+  }
+
+  openDayViewer(day: CalendarDay): void {
+    if (day.isPast) return;
+    this.viewingDay.set(day);
+  }
+
+  closeDayViewer(): void {
+    this.viewingDay.set(null);
   }
 
   closeModal(): void {
@@ -300,10 +360,11 @@ export class SetScheduleModalComponent {
 
   private resetState(): void {
     this.modalState.set('loading');
-    this.currentDate.set(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })));
+    this.currentDate.set(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }))); 
     this.selectedEmployeeIds.set(new Set());
     this.schedules.set(new Map());
     this.initialSchedules.set(new Map());
     this.errorMessage.set(null);
+    this.viewingDay.set(null);
   }
 }

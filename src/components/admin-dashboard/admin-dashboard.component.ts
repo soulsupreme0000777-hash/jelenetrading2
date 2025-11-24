@@ -1,32 +1,30 @@
-import { Component, ChangeDetectionStrategy, inject, signal, effect, computed, OnDestroy, viewChild, ElementRef } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, signal, effect, computed, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
-import { SupabaseService, Profile, DtrEntry, Payroll, SalaryRule, EmployeeStatus, EmployeeSchedule } from '../../services/supabase.service';
+import { SupabaseService, Profile, DtrEntry, Payroll, EmployeeStatus, EmployeeSchedule, SalaryRule, CompanySetting, Position } from '../../services/supabase.service';
 import { AddEmployeeModalComponent } from '../add-employee-modal/add-employee-modal.component';
 import { RunPayrollModalComponent } from '../run-payroll-modal/run-payroll-modal.component';
 import { ConfirmationModalComponent } from '../confirmation-modal/confirmation-modal.component';
-import { DatePipe, CurrencyPipe } from '@angular/common';
+import { DatePipe, CurrencyPipe, DecimalPipe } from '@angular/common';
 import { ViewEmployeeModalComponent } from '../view-employee-modal/view-employee-modal.component';
 import { IdCardModalComponent } from '../id-card-modal/id-card-modal.component';
 import { SetScheduleModalComponent } from '../set-schedule-modal/set-schedule-modal.component';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { DtrExportModalComponent } from '../dtr-export-modal/dtr-export-modal.component';
+import { SalaryAdjustmentModalComponent } from '../salary-adjustment-modal/salary-adjustment-modal.component';
+import { DtrBulkExportModalComponent } from '../dtr-bulk-export-modal/dtr-bulk-export-modal.component';
+import { IdCardBulkViewModalComponent } from '../id-card-bulk-view-modal/id-card-bulk-view-modal.component';
+import { EmployeeDetailsBulkViewModalComponent } from '../employee-details-bulk-view-modal/employee-details-bulk-view-modal.component';
+import { FormsModule } from '@angular/forms';
 
-declare var jsQR: any;
+// FIX: The RealtimeChannel type is not available from the Supabase import due to environment/versioning issues.
+// The import is removed, and `any` will be used as a workaround.
+// import { RealtimeChannel } from '@supabase/supabase-js';
 
-type AdminTab = 'employees' | 'dtr' | 'payroll' | 'analytics';
+type AdminTab = 'manage-employees' | 'dtr' | 'payroll' | 'daily-logs' | 'manage-payroll' | 'recovery' | 'analytics';
 
 interface ConfirmModalConfig {
   title: string;
   message: string;
   onConfirm: () => void;
-}
-
-interface DtrPayPeriodGroup {
-  id: string; // e.g., "2023-10-16_2023-11-15"
-  display: string; // e.g., "October 16 - November 15, 2023"
-  payPeriodStart: Date;
-  payPeriodEnd: Date;
-  entries: (DtrEntry & { profiles: Profile | null })[];
-  payrollStatus: 'Processed' | 'Not Processed';
 }
 
 interface PayrollGroup {
@@ -50,6 +48,43 @@ interface LiveEmployeeStatus {
   dtrEntries: DtrEntry[];
 }
 
+// --- DTR Timesheet Specific Types ---
+type TimesheetCellStatus = 'Present' | 'Late' | 'Absent' | 'Leave' | 'NoSchedule' | 'Weekend';
+interface TimesheetDay {
+    dateStr: string;
+    dayOfMonth: number;
+    isToday: boolean;
+    // FIX: Added the `isCurrentMonth` property to align the type with its usage in the `monthlyAttendanceSummary` computed signal.
+    isCurrentMonth: boolean;
+    isWeekend: boolean;
+    status: TimesheetCellStatus;
+    hoursWorked: number | null;
+    dtr: DtrEntry[];
+}
+interface TimesheetRow {
+    employee: Profile;
+    days: TimesheetDay[];
+}
+interface DtrSummary {
+    present: number;
+    onLeave: number;
+    late: number;
+    absent: number;
+}
+interface AvailablePayPeriod {
+    id: string;
+    display: string;
+    start: Date;
+    end: Date;
+    isProcessed?: boolean;
+}
+
+export interface PayrollSettings {
+  late_rate_per_minute: number;
+  grace_period_minutes: number;
+  birth_month_bonus: { [positionName: string]: number };
+}
+
 @Component({
   selector: 'app-admin-dashboard',
   templateUrl: './admin-dashboard.component.html',
@@ -62,52 +97,41 @@ interface LiveEmployeeStatus {
     ViewEmployeeModalComponent,
     IdCardModalComponent,
     SetScheduleModalComponent,
+    DtrExportModalComponent,
+    SalaryAdjustmentModalComponent,
+    DtrBulkExportModalComponent,
+    IdCardBulkViewModalComponent,
+    EmployeeDetailsBulkViewModalComponent,
     DatePipe, 
-    CurrencyPipe
+    CurrencyPipe,
+    FormsModule,
+    DecimalPipe
   ],
 })
 export class AdminDashboardComponent implements OnDestroy {
   private readonly supabaseService = inject(SupabaseService);
   private readonly router: Router = inject(Router);
-  private realtimeChannel: RealtimeChannel | null = null;
+  // FIX: Using `any` as RealtimeChannel type is not available from import.
+  private realtimeChannel: any | null = null;
   private notificationTimer: any;
   private timerInterval: any;
 
   readonly currentUserRole = this.supabaseService.currentUserRole;
-  activeTab = signal<AdminTab>('employees');
+  activeTab = signal<AdminTab>('analytics');
   isSidebarOpen = signal(false);
   notification = signal<Notification | null>(null);
   readonly currentYear = new Date().getFullYear();
 
-  // Employee Search & Sort
+  // Employee Search, Sort, and Selection
   searchTerm = signal<string>('');
   employeeSortOption = signal<'newest' | 'oldest' | 'lastNameAsc' | 'lastNameDesc'>('newest');
+  selectedEmployees = signal(new Set<string>());
+  isMultiSelectMode = signal(false);
 
   employees = signal<Profile[]>([]);
   employeesLoading = signal(true);
   employeesError = signal<string | null>(null);
   
-  // --- Time Clock Mode Signals & Properties ---
-  video = viewChild<ElementRef<HTMLVideoElement>>('video');
-  canvas = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
-  isTimeClockModeActive = signal(false);
-  scannerLoading = signal(false);
-  scannerErrorMessage = signal<string | null>(null);
-  lastScanResult = signal<{ profile: Profile; dtrEntry: DtrEntry; status: string } | null>(null);
-  breakCountdown = signal<number | null>(null);
-  breakCountdownDisplay = computed(() => {
-    const seconds = this.breakCountdown();
-    if (seconds === null || seconds < 0) return '00:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  });
-
-  private stream: MediaStream | null = null;
-  private isScanning = false;
-  private scanResultTimer: any;
-  private breakTimerInterval: any;
-
   filteredEmployees = computed(() => {
     const term = this.searchTerm().toLowerCase().trim();
     const sortOption = this.employeeSortOption();
@@ -138,97 +162,201 @@ export class AdminDashboardComponent implements OnDestroy {
 
     return sorted;
   });
-
-  // DTR Signals
-  dtrSearchTerm = signal<string>('');
-  dtrSortOption = signal<'newest' | 'oldest' | 'nameAsc' | 'nameDesc'>('newest');
-  dtrEntries = signal<(DtrEntry & { profiles: Profile | null })[]>([]);
-  dtrLoading = signal(true);
-  dtrError = signal<string | null>(null);
-  openDtrPeriods = signal(new Set<string>()); // To track open accordions
   
-  groupedDtrPayPeriods = computed<DtrPayPeriodGroup[]>(() => {
-    const allDtr = this.dtrEntries();
-    const allPayrolls = this.payrolls();
-    const term = this.dtrSearchTerm().toLowerCase().trim();
-    const sortOption = this.dtrSortOption();
+  isAllEmployeesSelected = computed(() => {
+    const filtered = this.filteredEmployees();
+    return filtered.length > 0 && this.selectedEmployees().size === filtered.length;
+  });
 
-    if (!allDtr.length) return [];
+  selectedEmployeeIdsArray = computed(() => [...this.selectedEmployees()]);
 
-    const dtrByPeriod: Record<string, DtrPayPeriodGroup> = {};
+  selectedEmployeeProfiles = computed(() => {
+    const selectedIds = this.selectedEmployees();
+    return this.employees().filter(e => selectedIds.has(e.id));
+  });
 
-    for (const entry of allDtr) {
-        if (!entry.time_in) continue;
-        const entryDate = new Date(entry.time_in);
-        const day = entryDate.getUTCDate();
-        let month = entryDate.getUTCMonth();
-        let year = entryDate.getUTCFullYear();
+  // --- NEW DTR Tab Signals ---
+  dtrViewDate = signal(new Date());
+  dtrDataLoading = signal(true);
+  dtrSchedules = signal<EmployeeSchedule[]>([]);
+  dtrEntries = signal<DtrEntry[]>([]);
+  dtrStatuses = signal<EmployeeStatus[]>([]);
+  isPayrollPeriodSelectorVisible = signal(false);
+  dtrSearchTerm = signal<string>('');
+  dtrFilterStatus = signal<'all' | 'present' | 'late' | 'absent' | 'noSchedule'>('all');
 
-        let periodStart: Date;
-        let periodEnd: Date;
 
-        if (day >= 16) {
-            periodStart = new Date(Date.UTC(year, month, 16));
-            periodEnd = new Date(Date.UTC(year, month + 1, 15, 23, 59, 59, 999));
-        } else {
-            periodStart = new Date(Date.UTC(year, month - 1, 16));
-            periodEnd = new Date(Date.UTC(year, month, 15, 23, 59, 59, 999));
-        }
+  dtrCalendarDays = computed(() => {
+      const viewDate = this.dtrViewDate();
+      const year = viewDate.getFullYear();
+      const month = viewDate.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      
+      const days = [];
+      for (let i = 1; i <= daysInMonth; i++) {
+          const date = new Date(year, month, i);
+          const dayOfWeek = date.getDay();
+          days.push({
+              dateStr: date.toISOString().slice(0, 10),
+              dayOfMonth: i,
+              isToday: new Date().toDateString() === date.toDateString(),
+              // FIX: Add `isCurrentMonth` to ensure the generated data aligns with the `TimesheetDay` type.
+              isCurrentMonth: true,
+              isWeekend: dayOfWeek === 0 || dayOfWeek === 6,
+              dayName: date.toLocaleDateString('en-US', { weekday: 'short' })
+          });
+      }
+      return days;
+  });
 
-        const periodId = `${periodStart.toISOString().slice(0, 10)}_${periodEnd.toISOString().slice(0, 10)}`;
+  dtrTimesheetData = computed<TimesheetRow[]>(() => {
+    const employees = this.employees();
+    const calendarDays = this.dtrCalendarDays();
+    const schedules = this.dtrSchedules();
+    const dtr = this.dtrEntries();
+    const statuses = this.dtrStatuses();
+    const gracePeriod = this.payrollSettings().grace_period_minutes;
 
-        if (!dtrByPeriod[periodId]) {
-            const periodStartStr = periodStart.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-            const periodEndStr = periodEnd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const scheduleMap = new Map<string, EmployeeSchedule>(schedules.map(s => [`${s.user_id}|${s.date}`, s]));
+    const statusMap = new Map<string, EmployeeStatus>(statuses.map(s => [`${s.user_id}|${s.date}`, s]));
+    const dtrMap = new Map<string, DtrEntry[]>();
+    dtr.forEach(entry => {
+        if (!entry.time_in) return;
+        const key = `${entry.user_id}|${new Date(entry.time_in).toISOString().slice(0, 10)}`;
+        if (!dtrMap.has(key)) dtrMap.set(key, []);
+        dtrMap.get(key)!.push(entry);
+    });
+
+    return employees.map(employee => {
+        const days: TimesheetDay[] = calendarDays.map(day => {
+            const key = `${employee.id}|${day.dateStr}`;
+            const schedule = scheduleMap.get(key);
+            const status = statusMap.get(key);
+            const dailyDtr = (dtrMap.get(key) || []).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+            let cellStatus: TimesheetCellStatus = 'NoSchedule';
+            let hoursWorked: number | null = null;
             
-            const isProcessed = allPayrolls.some(p => p.pay_period_start.startsWith(periodStart.toISOString().slice(0, 10)));
+            if (day.isWeekend && !schedule) {
+                cellStatus = 'Weekend';
+            } else if (status) {
+                cellStatus = 'Leave';
+            } else if (schedule) {
+                if (dailyDtr.length > 0) {
+                    const expectedStart = new Date(`${day.dateStr}T${schedule.work_start_time}`);
+                    const actualStart = new Date(dailyDtr[0].time_in!);
+                    cellStatus = (actualStart.getTime() - expectedStart.getTime()) / 60000 > gracePeriod ? 'Late' : 'Present';
+
+                    let workMs = 0;
+                    if (dailyDtr[0].time_out) workMs += new Date(dailyDtr[0].time_out).getTime() - new Date(dailyDtr[0].time_in!).getTime();
+                    if (dailyDtr.length > 1 && dailyDtr[1].time_in && dailyDtr[1].time_out) {
+                        workMs += new Date(dailyDtr[1].time_out).getTime() - new Date(dailyDtr[1].time_in).getTime();
+                    }
+                    hoursWorked = parseFloat((workMs / 3600000).toFixed(1));
+
+                } else {
+                    cellStatus = 'Absent';
+                }
+            }
             
-            dtrByPeriod[periodId] = {
-                id: periodId,
-                display: `${periodStartStr} - ${periodEndStr}`,
-                payPeriodStart: periodStart,
-                payPeriodEnd: periodEnd,
-                entries: [],
-                payrollStatus: isProcessed ? 'Processed' : 'Not Processed'
-            };
-        }
-        dtrByPeriod[periodId].entries.push(entry);
+            return { ...day, status: cellStatus, hoursWorked, dtr: dailyDtr };
+        });
+        return { employee, days };
+    });
+  });
+
+  filteredDtrTimesheetData = computed(() => {
+    const originalData = this.dtrTimesheetData();
+    const searchTerm = this.dtrSearchTerm().toLowerCase().trim();
+    const filterStatus = this.dtrFilterStatus();
+  
+    // 1. Filter by search term
+    const searchedData = !searchTerm
+      ? originalData
+      : originalData.filter(row =>
+          `${row.employee.first_name || ''} ${row.employee.last_name || ''}`.toLowerCase().includes(searchTerm)
+        );
+  
+    // 2. If no specific status filter, return the searched data as is (for the grid view)
+    if (filterStatus === 'all') {
+      return searchedData;
     }
-    
-    const sortedGroups = Object.values(dtrByPeriod).sort((a, b) => b.payPeriodStart.getTime() - a.payPeriodStart.getTime());
+  
+    // 3. Filter by status and transform the data for list view
+    const statusMap: { [key: string]: TimesheetCellStatus[] } = {
+        present: ['Present'],
+        late: ['Late'],
+        absent: ['Absent'],
+        noSchedule: ['NoSchedule']
+    };
+    const targetStatuses = statusMap[filterStatus];
+  
+    return searchedData.map(row => {
+        const matchingDays = row.days.filter(day => targetStatuses.includes(day.status));
+        return { ...row, days: matchingDays };
+      })
+      .filter(row => row.days.length > 0); // Only include employees who have days matching the filter
+  });
 
-    // Filter and sort entries within each group
-    return sortedGroups.map(group => {
-      // Filter
-      const filteredEntries = group.entries.filter(entry => {
-        if (!term) return true;
-        const fullName = `${entry.profiles?.first_name || ''} ${entry.profiles?.last_name || ''}`.toLowerCase();
-        return fullName.includes(term);
-      });
+  dtrSummary = computed<DtrSummary>(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const timesheet = this.dtrTimesheetData();
+    const summary: DtrSummary = { present: 0, onLeave: 0, late: 0, absent: 0 };
 
-      // Sort
-      const sortedAndFilteredEntries = filteredEntries.sort((a, b) => {
-        switch (sortOption) {
-          case 'nameAsc': {
-            const nameA = `${a.profiles?.last_name || ''} ${a.profiles?.first_name || ''}`.trim();
-            const nameB = `${b.profiles?.last_name || ''} ${b.profiles?.first_name || ''}`.trim();
-            return nameA.localeCompare(nameB);
-          }
-          case 'nameDesc': {
-            const nameA = `${a.profiles?.last_name || ''} ${a.profiles?.first_name || ''}`.trim();
-            const nameB = `${b.profiles?.last_name || ''} ${b.profiles?.first_name || ''}`.trim();
-            return nameB.localeCompare(nameA);
-          }
-          case 'oldest':
-            return new Date(a.time_in || 0).getTime() - new Date(b.time_in || 0).getTime();
-          case 'newest':
-          default:
-            return new Date(b.time_in || 0).getTime() - new Date(a.time_in || 0).getTime();
+    if (!timesheet.length) return summary;
+
+    timesheet.forEach(row => {
+        const todayData = row.days.find(d => d.dateStr === todayStr);
+        if (todayData) {
+            switch (todayData.status) {
+                case 'Present': summary.present++; break;
+                case 'Late': summary.late++; break;
+                case 'Leave': summary.onLeave++; break;
+                case 'Absent': summary.absent++; break;
+            }
         }
+    });
+    return summary;
+  });
+
+  availablePayPeriods = computed<AvailablePayPeriod[]>(() => {
+      const allDtr = this.dtrEntries();
+      const allPayrolls = this.payrolls();
+
+      if (!allDtr.length) return [];
+      
+      const periods: Record<string, { start: Date, end: Date }> = {};
+      allDtr.forEach(entry => {
+          if (!entry.time_in) return;
+          const entryDate = new Date(entry.time_in);
+          const day = entryDate.getUTCDate();
+          let month = entryDate.getUTCMonth();
+          let year = entryDate.getUTCFullYear();
+
+          let periodStart: Date, periodEnd: Date;
+          if (day >= 16) {
+              periodStart = new Date(Date.UTC(year, month, 16));
+              periodEnd = new Date(Date.UTC(year, month + 1, 15, 23, 59, 59, 999));
+          } else {
+              periodStart = new Date(Date.UTC(year, month - 1, 16));
+              periodEnd = new Date(Date.UTC(year, month, 15, 23, 59, 59, 999));
+          }
+          const periodId = `${periodStart.toISOString().slice(0, 10)}_${periodEnd.toISOString().slice(0, 10)}`;
+          if (!periods[periodId]) {
+              periods[periodId] = { start: periodStart, end: periodEnd };
+          }
       });
       
-      return { ...group, entries: sortedAndFilteredEntries };
-    }).filter(group => group.entries.length > 0);
+      const processedPeriodStarts = new Set(allPayrolls.map(p => p.pay_period_start.slice(0, 10)));
+      
+      return Object.entries(periods)
+        .map(([id, dates]) => ({
+            id,
+            display: `${dates.start.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - ${dates.end.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
+            ...dates,
+            isProcessed: processedPeriodStarts.has(dates.start.toISOString().slice(0, 10)),
+        }))
+        .sort((a, b) => b.start.getTime() - a.start.getTime());
   });
 
   // Payroll Signals
@@ -244,8 +372,6 @@ export class AdminDashboardComponent implements OnDestroy {
     if (!allPayrolls.length) {
       return [];
     }
-
-    // 1. Group payrolls by month based on pay_period_end
     const groups: Record<string, PayrollGroup> = {};
     for (const payroll of allPayrolls) {
       const date = new Date(payroll.pay_period_end);
@@ -259,11 +385,8 @@ export class AdminDashboardComponent implements OnDestroy {
       }
       groups[monthYearValue].payrolls.push(payroll);
     }
-
-    // 2. Convert to array and sort groups (newest first)
+    // FIX: Correctly compare the `monthYearValue` string of both objects in the sort function.
     const sortedGroups = Object.values(groups).sort((a, b) => b.monthYearValue.localeCompare(a.monthYearValue));
-
-    // 3. Sort entries within each group (by employee name)
     return sortedGroups.map(group => {
       const sortedPayrolls = group.payrolls.sort((a, b) => {
           const nameA = `${a.profiles?.last_name || ''} ${a.profiles?.first_name || ''}`.trim();
@@ -274,20 +397,131 @@ export class AdminDashboardComponent implements OnDestroy {
     });
   });
 
-  // --- Analytics Signals ---
-  liveEmployeeStatus = signal<LiveEmployeeStatus[]>([]);
-  analyticsLoading = signal(true);
-  analyticsError = signal<string | null>(null);
+  // --- Manage Payroll Signals ---
+  settingsLoading = signal(true);
+  positions = signal<Position[]>([]);
+  payrollSettings = signal<PayrollSettings>({
+    late_rate_per_minute: 1.60,
+    grace_period_minutes: 15,
+    birth_month_bonus: {},
+  });
+  salaryRules = signal<SalaryRule[]>([]);
+  salaryRulesLoading = signal(true);
+  isSalaryAdjustmentModalVisible = signal(false);
+  adjustmentToEdit = signal<SalaryRule | null>(null);
 
+  // --- Daily Logs Signals ---
+  liveEmployeeStatus = signal<LiveEmployeeStatus[]>([]);
+  dailyLogsLoading = signal(true);
+  dailyLogsError = signal<string | null>(null);
+  
+  // --- Recovery Signals ---
+  deletedEmployees = signal<Profile[]>([]);
+  recoveryLoading = signal(true);
+  recoveryError = signal<string | null>(null);
+  
+  // --- Analytics Signals ---
+  colorPalette = [
+    { text: 'text-indigo-500', bg: 'bg-indigo-500' },
+    { text: 'text-sky-500', bg: 'bg-sky-500' },
+    { text: 'text-emerald-500', bg: 'bg-emerald-500' },
+    { text: 'text-amber-500', bg: 'bg-amber-500' },
+    { text: 'text-rose-500', bg: 'bg-rose-500' },
+    { text: 'text-fuchsia-500', bg: 'bg-fuchsia-500' },
+  ];
+
+  totalEmployees = computed(() => this.employees().length);
+  totalBranches = computed(() => new Set(this.employees().filter(e => e.branch).map(e => e.branch)).size);
+  
+  distributionByBranch = computed(() => {
+    const branchCounts = this.employees().reduce((acc, emp) => {
+      const branch = emp.branch || 'Unassigned';
+      acc[branch] = (acc[branch] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const sortedBranches = Object.entries(branchCounts).sort((a, b) => b[1] - a[1]);
+    const total = this.employees().length;
+    if (total === 0) return [];
+
+    let cumulativePercentage = 0;
+    return sortedBranches.map(([name, count], index) => {
+      const percentage = (count / total) * 100;
+      const colorSet = this.colorPalette[index % this.colorPalette.length];
+      const data = {
+        name,
+        count,
+        percentage,
+        offset: cumulativePercentage,
+        textColor: colorSet.text,
+        bgColor: colorSet.bg,
+      };
+      cumulativePercentage += percentage;
+      return data;
+    });
+  });
+
+  distributionByPosition = computed(() => {
+    const positionCounts = this.employees().reduce((acc, emp) => {
+      const position = emp.position || 'Unassigned';
+      acc[position] = (acc[position] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const sortedPositions = Object.entries(positionCounts).sort((a, b) => b[1] - a[1]);
+    const maxCount = sortedPositions[0]?.[1] || 0;
+
+    return sortedPositions.map(([name, count], index) => ({
+      name,
+      count,
+      heightPercentage: maxCount > 0 ? (count / maxCount) * 100 : 0,
+      color: this.colorPalette[index % this.colorPalette.length].bg,
+    }));
+  });
+
+  monthlyAttendanceSummary = computed(() => {
+    const summary = { present: 0, late: 0, absent: 0, onLeave: 0 };
+    this.dtrTimesheetData().forEach(row => {
+        row.days.forEach(day => {
+            if (day.isCurrentMonth && !day.isWeekend && day.status !== 'NoSchedule') {
+                switch(day.status) {
+                    case 'Present': summary.present++; break;
+                    case 'Late': summary.late++; break;
+                    case 'Absent': summary.absent++; break;
+                    case 'Leave': summary.onLeave++; break;
+                }
+            }
+        });
+    });
+    
+    const total = summary.present + summary.late + summary.absent + summary.onLeave;
+    
+    return {
+      stats: [
+        { name: 'Present', count: summary.present, percentage: total > 0 ? (summary.present / total) * 100 : 0, color: 'bg-green-500' },
+        { name: 'Late', count: summary.late, percentage: total > 0 ? (summary.late / total) * 100 : 0, color: 'bg-yellow-500' },
+        { name: 'On Leave', count: summary.onLeave, percentage: total > 0 ? (summary.onLeave / total) * 100 : 0, color: 'bg-blue-500' },
+        { name: 'Absent', count: summary.absent, percentage: total > 0 ? (summary.absent / total) * 100 : 0, color: 'bg-red-500' }
+      ],
+      total,
+    };
+  });
+
+
+  // --- Modals Visibility ---
   isAddEmployeeModalVisible = signal(false);
   isRunPayrollModalVisible = signal(false); 
   isIdCardModalVisible = signal(false);
   isViewEmployeeModalVisible = signal(false);
   isSetScheduleModalVisible = signal(false);
+  isDtrExportModalVisible = signal(false);
+  isDtrBulkExportModalVisible = signal(false);
+  isIdCardBulkViewModalVisible = signal(false);
+  isEmployeeDetailsBulkViewModalVisible = signal(false);
   
   logoutError = signal<string | null>(null);
   
-  selectedEmployee = signal<Profile | null>(null);
+  selectedEmployeeForModal = signal<Profile | null>(null);
   employeeToEdit = signal<Profile | null>(null);
   
   isConfirmModalVisible = signal(false);
@@ -298,13 +532,20 @@ export class AdminDashboardComponent implements OnDestroy {
 
     effect((onCleanup) => {
       const tab = this.activeTab();
-      // Pre-load data for better UX
-      if (tab === 'employees' && this.employees().length === 0) this.loadEmployees();
-      if (tab === 'dtr' && this.dtrEntries().length === 0) this.loadDtrAndPayrolls();
+      if ((tab === 'manage-employees' || tab === 'analytics') && this.employees().length === 0) this.loadEmployees();
       if (tab === 'payroll' && this.payrolls().length === 0) this.loadPayrolls();
+      if (tab === 'recovery' && this.deletedEmployees().length === 0) this.loadDeletedEmployees();
       
-      if (tab === 'analytics') {
-        this.loadLiveAnalyticsData();
+      if (tab === 'dtr' || tab === 'analytics') {
+        this.loadDtrMonthlyData();
+      }
+      
+      if (tab === 'manage-payroll') {
+        this.loadPayrollSettings();
+      }
+
+      if (tab === 'daily-logs') {
+        this.loadDailyLogsData();
         if (this.timerInterval) clearInterval(this.timerInterval);
         this.timerInterval = setInterval(() => this.updateTimers(), 1000);
       } else {
@@ -316,13 +557,11 @@ export class AdminDashboardComponent implements OnDestroy {
       }
       this.realtimeChannel = this.supabaseService.subscribeToTableChanges(() => {
         const currentTab = this.activeTab();
-        if (currentTab === 'employees') {
-            this.loadEmployees();
-        } else if (currentTab === 'dtr') {
-            this.loadDtrAndPayrolls();
-        } else if (currentTab === 'analytics') {
-            this.loadLiveAnalyticsData();
-        }
+        if (currentTab === 'manage-employees' || currentTab === 'analytics') this.loadEmployees();
+        if (currentTab === 'recovery') this.loadDeletedEmployees();
+        if (currentTab === 'dtr' || currentTab === 'analytics') this.loadDtrMonthlyData();
+        if (currentTab === 'daily-logs') this.loadDailyLogsData();
+        if (currentTab === 'manage-payroll') this.loadPayrollSettings();
       });
 
       onCleanup(() => {
@@ -330,16 +569,6 @@ export class AdminDashboardComponent implements OnDestroy {
         if (this.timerInterval) clearInterval(this.timerInterval);
       });
 
-    });
-
-    // Effect for scanner lifecycle
-    effect(() => {
-        const videoElRef = this.video();
-        if (this.isTimeClockModeActive() && videoElRef) {
-            this.startScanner();
-        } else {
-            this.stopScanner();
-        }
     });
   }
 
@@ -353,11 +582,11 @@ export class AdminDashboardComponent implements OnDestroy {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
     }
-    this.stopScanner();
   }
 
   loadInitialData(): void {
     this.loadEmployees();
+    this.loadPayrolls();
   }
 
   showNotification(type: 'success' | 'error', message: string, duration = 5000): void {
@@ -373,58 +602,27 @@ export class AdminDashboardComponent implements OnDestroy {
     this.searchTerm.set(value);
   }
 
-  onDtrSearchTermChange(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    this.dtrSearchTerm.set(value);
-  }
-
   setEmployeeSort(event: Event): void {
     const value = (event.target as HTMLSelectElement).value as 'newest' | 'oldest' | 'lastNameAsc' | 'lastNameDesc';
     this.employeeSortOption.set(value);
   }
 
-  setDtrSort(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value as 'newest' | 'oldest' | 'nameAsc' | 'nameDesc';
-    this.dtrSortOption.set(value);
-  }
-
   setActiveTab(tab: AdminTab): void {
     this.activeTab.set(tab);
+    this.selectedEmployees.set(new Set()); // Clear selection when changing tabs
   }
 
   async loadEmployees(): Promise<void> {
     this.employeesLoading.set(true);
     this.employeesError.set(null);
     try {
-      // The service now fetches only employee profiles directly.
       const { data, error } = await this.supabaseService.getAllUsersWithProfiles();
       if (error) throw error;
-
       this.employees.set(data || []);
-
     } catch (e: any) {
       this.employeesError.set(`Failed to load employees: ${e.message}`);
     } finally {
       this.employeesLoading.set(false);
-    }
-  }
-
-  async loadDtrAndPayrolls(): Promise<void> {
-    await this.loadDtrEntries();
-    await this.loadPayrolls();
-  }
-
-  async loadDtrEntries(): Promise<void> {
-    this.dtrLoading.set(true);
-    this.dtrError.set(null);
-    try {
-      const { data, error } = await this.supabaseService.getAllDtrEntries();
-      if (error) throw error;
-      this.dtrEntries.set(data as any || []);
-    } catch (e: any) {
-      this.dtrError.set(`Failed to load DTR entries: ${e.message}`);
-    } finally {
-      this.dtrLoading.set(false);
     }
   }
 
@@ -442,9 +640,154 @@ export class AdminDashboardComponent implements OnDestroy {
     }
   }
 
-  async loadLiveAnalyticsData(): Promise<void> {
-    this.analyticsLoading.set(true);
-    this.analyticsError.set(null);
+  async loadDtrMonthlyData(): Promise<void> {
+    this.dtrDataLoading.set(true);
+    const viewDate = this.dtrViewDate();
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+
+    const startDate = new Date(year, month, 1).toISOString();
+    const endDate = new Date(year, month + 1, 1).toISOString();
+    const employeeIds = this.employees().map(e => e.id);
+
+    try {
+        if(this.employees().length === 0) await this.loadEmployees();
+        
+        const [schedulesRes, dtrRes, statusesRes] = await Promise.all([
+            this.supabaseService.getSchedulesForDateRange(employeeIds, startDate.slice(0, 10), endDate.slice(0, 10)),
+            this.supabaseService.getDtrEntriesForDateRange(startDate, endDate),
+            this.supabaseService.getAllStatusesForDateRange(employeeIds, startDate.slice(0, 10), endDate.slice(0, 10))
+        ]);
+
+        if (schedulesRes.error) throw schedulesRes.error;
+        this.dtrSchedules.set(schedulesRes.data || []);
+        
+        if (dtrRes.error) throw dtrRes.error;
+        this.dtrEntries.set(dtrRes.data || []);
+
+        if (statusesRes.error) throw statusesRes.error;
+        this.dtrStatuses.set(statusesRes.data || []);
+    } catch (e: any) {
+        console.error("Failed to load DTR monthly data", e);
+    } finally {
+        this.dtrDataLoading.set(false);
+    }
+  }
+
+  changeDtrMonth(offset: number): void {
+      this.dtrViewDate.update(d => {
+          const newDate = new Date(d);
+          newDate.setMonth(newDate.getMonth() + offset);
+          return newDate;
+      });
+      this.loadDtrMonthlyData();
+  }
+  
+   async loadPayrollSettings(): Promise<void> {
+    this.settingsLoading.set(true);
+    this.salaryRulesLoading.set(true);
+    try {
+        const [settingsRes, rulesRes, positionsRes] = await Promise.all([
+            this.supabaseService.getCompanySettings(),
+            this.supabaseService.getAllSalaryRules(),
+            this.supabaseService.getPositions()
+        ]);
+
+        if (settingsRes.error) throw settingsRes.error;
+        if (rulesRes.error) throw rulesRes.error;
+        if (positionsRes.error) throw positionsRes.error;
+
+        // Process company settings
+        const settingsData = settingsRes.data || [];
+        this.payrollSettings.update(currentSettings => {
+            const newSettings: PayrollSettings = { ...currentSettings };
+            settingsData.forEach(s => {
+                if (s.setting_key in newSettings) {
+                    (newSettings as any)[s.setting_key] = s.setting_value;
+                }
+            });
+            return newSettings;
+        });
+
+        // Process salary rules
+        this.salaryRules.set(rulesRes.data || []);
+
+        // Process positions for bonus form
+        this.positions.set(positionsRes.data || []);
+
+    } catch (e: any) {
+        let message = e.message || 'An unknown error occurred.';
+        if (typeof message === 'string' && message.includes('Could not find the table')) {
+             message = `Database schema is out of date. ${message}. Please run the full setup script from the comments in 'src/services/supabase.service.ts' in your Supabase SQL editor to create the missing tables.`;
+        }
+        this.showNotification('error', `Failed to load payroll settings: ${message}`);
+    } finally {
+        this.settingsLoading.set(false);
+        this.salaryRulesLoading.set(false);
+    }
+  }
+
+  async savePayrollSettings(): Promise<void> {
+    const currentSettings = this.payrollSettings();
+    const settingsToUpdate = Object.entries(currentSettings).map(([key, value]) => ({
+      key,
+      value: typeof value === 'object' ? JSON.stringify(value) : value,
+    }));
+  
+    try {
+      await this.supabaseService.updateCompanySettings(settingsToUpdate);
+      this.showNotification('success', 'Payroll settings saved successfully.');
+    } catch (e: any) {
+      this.showNotification('error', `Failed to save settings: ${e.message}`);
+    }
+  }
+
+  
+  openAddSalaryRuleModal(): void {
+    this.adjustmentToEdit.set(null);
+    this.isSalaryAdjustmentModalVisible.set(true);
+  }
+
+  openEditSalaryRuleModal(rule: SalaryRule): void {
+    this.adjustmentToEdit.set(rule);
+    this.isSalaryAdjustmentModalVisible.set(true);
+  }
+
+  closeSalaryRuleModal(): void {
+    this.isSalaryAdjustmentModalVisible.set(false);
+    this.adjustmentToEdit.set(null);
+  }
+
+  onSalaryRuleSaved(): void {
+    this.showNotification('success', 'Salary rule has been saved.');
+    this.loadPayrollSettings();
+  }
+
+  openDeleteSalaryRuleConfirmation(rule: SalaryRule): void {
+    this.confirmModalConfig.set({
+      title: 'Delete Salary Rule?',
+      message: `Are you sure you want to delete the rule "${rule.name}"? This action cannot be undone.`,
+      onConfirm: () => this.handleDeleteSalaryRule(rule.id),
+    });
+    this.isConfirmModalVisible.set(true);
+  }
+
+  async handleDeleteSalaryRule(ruleId: number): Promise<void> {
+    try {
+      const { error } = await this.supabaseService.deleteSalaryRule(ruleId);
+      if (error) throw error;
+      this.showNotification('success', 'Salary rule deleted successfully.');
+      this.loadPayrollSettings();
+    } catch (e: any) {
+      this.showNotification('error', `Failed to delete rule: ${e.message}`);
+    } finally {
+      this.isConfirmModalVisible.set(false);
+    }
+  }
+
+  async loadDailyLogsData(): Promise<void> {
+    this.dailyLogsLoading.set(true);
+    this.dailyLogsError.set(null);
 
     try {
         const timeZone = 'Asia/Manila';
@@ -470,7 +813,7 @@ export class AdminDashboardComponent implements OnDestroy {
         const employees = employeesRes.data || [];
         if (employees.length === 0) {
             this.liveEmployeeStatus.set([]);
-            this.analyticsLoading.set(false);
+            this.dailyLogsLoading.set(false);
             return;
         }
 
@@ -587,9 +930,23 @@ export class AdminDashboardComponent implements OnDestroy {
         
         this.liveEmployeeStatus.set(statuses);
     } catch (e: any) {
-        this.analyticsError.set(e.message || 'Failed to load live data.');
+        this.dailyLogsError.set(e.message || 'Failed to load live data.');
     } finally {
-        this.analyticsLoading.set(false);
+        this.dailyLogsLoading.set(false);
+    }
+  }
+
+  async loadDeletedEmployees(): Promise<void> {
+    this.recoveryLoading.set(true);
+    this.recoveryError.set(null);
+    try {
+      const { data, error } = await this.supabaseService.getDeletedUsersWithProfiles();
+      if (error) throw error;
+      this.deletedEmployees.set(data || []);
+    } catch (e: any) {
+      this.recoveryError.set(`Failed to load deleted employees: ${e.message}`);
+    } finally {
+      this.recoveryLoading.set(false);
     }
   }
 
@@ -651,25 +1008,12 @@ export class AdminDashboardComponent implements OnDestroy {
   refreshPayrolls(): void {
     this.showNotification('success', 'Payroll list has been updated.');
     this.loadPayrolls();
-    this.loadDtrEntries(); // To update status
   }
   
   refreshAllData(): void {
     this.loadInitialData();
   }
   
-  toggleDtrPeriod(periodId: string): void {
-    this.openDtrPeriods.update(currentSet => {
-        const newSet = new Set(currentSet);
-        if (newSet.has(periodId)) {
-            newSet.delete(periodId);
-        } else {
-            newSet.add(periodId);
-        }
-        return newSet;
-    });
-  }
-
   togglePayrollMonth(monthYearValue: string): void {
     this.openPayrollMonths.update(currentSet => {
         const newSet = new Set(currentSet);
@@ -681,26 +1025,79 @@ export class AdminDashboardComponent implements OnDestroy {
         return newSet;
     });
   }
+  
+  // --- Employee Selection ---
+  toggleMultiSelectMode(): void {
+    this.isMultiSelectMode.update(v => !v);
+    if (!this.isMultiSelectMode()) {
+      this.selectedEmployees.set(new Set());
+    }
+  }
 
-  // --- Modal Management ---
+  toggleEmployeeSelection(employeeId: string): void {
+    this.selectedEmployees.update(currentSet => {
+      const newSet = new Set(currentSet);
+      if (newSet.has(employeeId)) {
+        newSet.delete(employeeId);
+      } else {
+        newSet.add(employeeId);
+      }
+      return newSet;
+    });
+  }
+
+  toggleAllEmployeeSelection(): void {
+    const allSelected = this.isAllEmployeesSelected();
+    const filteredIds = new Set(this.filteredEmployees().map(e => e.id));
+    if (allSelected) {
+      this.selectedEmployees.set(new Set());
+    } else {
+      this.selectedEmployees.set(filteredIds);
+    }
+  }
+
+  // --- Modal Management & Actions ---
   openAddEmployeeModal(): void {
     this.employeeToEdit.set(null);
     this.isAddEmployeeModalVisible.set(true);
   }
 
-  openEditEmployeeModal(employee: Profile): void {
-    this.employeeToEdit.set(employee);
-    this.isAddEmployeeModalVisible.set(true);
+  openEditEmployeeModal(): void {
+    const selectedIds = this.selectedEmployees();
+    if (selectedIds.size !== 1) return;
+    const employeeId = selectedIds.values().next().value;
+    const employee = this.employees().find(e => e.id === employeeId);
+    if (employee) {
+      this.employeeToEdit.set(employee);
+      this.isAddEmployeeModalVisible.set(true);
+    }
   }
   
   openViewEmployeeModal(employee: Profile): void {
-    this.selectedEmployee.set(employee);
+    this.selectedEmployeeForModal.set(employee);
     this.isViewEmployeeModalVisible.set(true);
   }
   
   openIdCardModal(employee: Profile): void {
-    this.selectedEmployee.set(employee);
+    this.selectedEmployeeForModal.set(employee);
     this.isIdCardModalVisible.set(true);
+  }
+
+  openDtrExportModal(employee: Profile): void {
+    this.selectedEmployeeForModal.set(employee);
+    this.isDtrExportModalVisible.set(true);
+  }
+  
+  openBulkIdCardModal(): void {
+    this.isIdCardBulkViewModalVisible.set(true);
+  }
+
+  openBulkDtrExportModal(): void {
+    this.isDtrBulkExportModalVisible.set(true);
+  }
+
+  openBulkDetailsModal(): void {
+    this.isEmployeeDetailsBulkViewModalVisible.set(true);
   }
 
   closeEmployeeModal(): void {
@@ -708,9 +1105,10 @@ export class AdminDashboardComponent implements OnDestroy {
     this.employeeToEdit.set(null);
   }
 
-  openRunPayrollForPeriod(group: DtrPayPeriodGroup): void {
-    this.selectedPayPeriod.set({ start: group.payPeriodStart, end: group.payPeriodEnd });
+  openRunPayrollForPeriod(period: AvailablePayPeriod): void {
+    this.selectedPayPeriod.set({ start: period.start, end: period.end });
     this.isRunPayrollModalVisible.set(true);
+    this.isPayrollPeriodSelectorVisible.set(false);
   }
 
   closeRunPayrollModal(): void {
@@ -718,30 +1116,62 @@ export class AdminDashboardComponent implements OnDestroy {
     this.selectedPayPeriod.set(null);
   }
 
-  // --- Employee Delete Operation ---
-  openDeleteConfirmation(employee: Profile): void {
+  // --- Employee Delete & Recovery Operation ---
+  openDeleteConfirmation(): void {
+    const count = this.selectedEmployees().size;
+    if (count === 0) return;
+    
     this.confirmModalConfig.set({
-      title: 'Delete Employee?',
-      message: `Are you sure you want to permanently delete ${employee.first_name} ${employee.last_name}? This will remove their profile and all associated data. This action cannot be undone.`,
-      onConfirm: () => this.handleDeleteEmployee(employee),
+      title: `Delete ${count} Employee(s)?`,
+      message: `Are you sure you want to delete ${count} employee(s)? Their records will be moved to the recovery tab where they can be restored or permanently deleted.`,
+      onConfirm: () => this.handleDeleteEmployees(),
     });
     this.isConfirmModalVisible.set(true);
   }
 
-  async handleDeleteEmployee(employee: Profile): Promise<void> {
-    const { error } = await this.supabaseService.deleteUserAndProfile(employee.id);
+  async handleDeleteEmployees(): Promise<void> {
+    const userIds = [...this.selectedEmployees()];
+    const { error } = await this.supabaseService.softDeleteUsers(userIds);
     if (error) {
-      let errorMessage = `Error deleting employee: ${error.message}`;
-      if (error.message.includes('Could not find the function')) {
-        errorMessage = 'Database setup required. Please see the instructions in the supabase.service.ts file to create the delete_auth_user function in your Supabase SQL Editor.';
-      }
-      this.showNotification('error', errorMessage);
+      this.showNotification('error', `Error deleting employees: ${error.message}`);
     } else {
-      this.showNotification('success', `${employee.first_name} ${employee.last_name} has been deleted.`);
-      this.loadEmployees(); // Reload list after deletion
+      this.showNotification('success', `${userIds.length} employee(s) have been deleted.`);
+      this.loadEmployees();
+      this.selectedEmployees.set(new Set());
     }
     this.isConfirmModalVisible.set(false);
   }
+  
+  async handleRecoverEmployee(employee: Profile): Promise<void> {
+    const { error } = await this.supabaseService.recoverUsers([employee.id]);
+    if (error) {
+      this.showNotification('error', `Error recovering employee: ${error.message}`);
+    } else {
+      this.showNotification('success', `${employee.first_name} ${employee.last_name} has been recovered.`);
+      this.loadDeletedEmployees();
+    }
+  }
+
+  openPermanentDeleteConfirmation(employee: Profile): void {
+    this.confirmModalConfig.set({
+      title: 'Permanently Delete Employee?',
+      message: `Are you sure you want to PERMANENTLY delete ${employee.first_name} ${employee.last_name}? This will remove their authentication account and all associated data. This action cannot be undone.`,
+      onConfirm: () => this.handlePermanentDelete(employee),
+    });
+    this.isConfirmModalVisible.set(true);
+  }
+  
+  async handlePermanentDelete(employee: Profile): Promise<void> {
+    const { error } = await this.supabaseService.permanentlyDeleteUser(employee.id);
+    if (error) {
+       this.showNotification('error', `Error deleting: ${error.message}`);
+    } else {
+      this.showNotification('success', `${employee.first_name} ${employee.last_name} has been permanently deleted.`);
+      this.loadDeletedEmployees();
+    }
+    this.isConfirmModalVisible.set(false);
+  }
+  
   
   async onPayrollStatusChange(payrollId: number, event: Event): Promise<void> {
     const newStatus = (event.target as HTMLSelectElement).value as 'Paid' | 'Delayed' | 'Unpaid';
@@ -749,20 +1179,15 @@ export class AdminDashboardComponent implements OnDestroy {
     const originalPayrolls = this.payrolls();
     const payrollToUpdate = originalPayrolls.find(p => p.id === payrollId);
     if (!payrollToUpdate) return;
-
-    // 1. Optimistically update UI
     this.payrolls.update(payrolls =>
       payrolls.map(p => (p.id === payrollId ? { ...p, status: newStatus } : p))
     );
 
     try {
-      // 2. Make API call
       const { error } = await this.supabaseService.updatePayrollStatus(payrollId, newStatus);
       if (error) throw error;
-      // Success: UI is already updated
       this.showNotification('success', `Payroll status updated to ${newStatus}.`);
     } catch (error: any) {
-      // 3. Revert on failure
       this.showNotification('error', `Failed to update status: ${error.message}. Reverting change.`);
       this.payrolls.set(originalPayrolls);
     }
@@ -781,150 +1206,11 @@ export class AdminDashboardComponent implements OnDestroy {
     }
   }
 
-  // --- Time Clock Mode Methods ---
-
-  toggleTimeClockMode(): void {
-    this.isTimeClockModeActive.update(active => !active);
-  }
-
-  private async startScanner(): Promise<void> {
-    try {
-        if (this.isScanning) return;
-        if (this.stream) this.stopScanner();
-        
-        const videoEl = this.video()?.nativeElement;
-        if (!videoEl || !navigator.mediaDevices?.getUserMedia) {
-            throw new Error('Camera not available or not supported by this browser.');
-        }
-        
-        this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-
-        videoEl.srcObject = this.stream;
-        videoEl.setAttribute('playsinline', 'true');
-        await videoEl.play();
-        
-        this.isScanning = true;
-        this.scannerErrorMessage.set(null);
-        this.lastScanResult.set(null);
-        requestAnimationFrame(this.tick.bind(this));
-
-    } catch (err: any) {
-        console.error('Error starting scanner:', err.message || err);
-        this.scannerErrorMessage.set(err.message || 'Could not access the camera. Check permissions.');
-    }
-  }
-
-  private stopScanner(): void {
-    this.isScanning = false;
-    if (this.scanResultTimer) {
-        clearTimeout(this.scanResultTimer);
-    }
-    this.stopBreakTimer();
-    if (this.stream) {
-        this.stream.getTracks().forEach(track => track.stop());
-        this.stream = null;
-    }
-    const videoEl = this.video()?.nativeElement;
-    if (videoEl) {
-        videoEl.srcObject = null;
-    }
-  }
-
-  private startBreakTimer(): void {
-    this.stopBreakTimer();
-    this.breakCountdown.set(3600); // 1 hour in seconds
-    this.breakTimerInterval = setInterval(() => {
-      this.breakCountdown.update(val => {
-        if (val === null || val <= 0) {
-          this.stopBreakTimer();
-          return 0;
-        }
-        return val - 1;
-      });
-    }, 1000);
-  }
-
-  private stopBreakTimer(): void {
-    if (this.breakTimerInterval) {
-      clearInterval(this.breakTimerInterval);
-      this.breakTimerInterval = null;
-      this.breakCountdown.set(null);
-    }
-  }
-
-  private tick(): void {
-    if (!this.isScanning) return;
-
-    const videoEl = this.video()?.nativeElement;
-    const canvasEl = this.canvas()?.nativeElement;
-    
-    if (videoEl && videoEl.readyState === videoEl.HAVE_ENOUGH_DATA && canvasEl) {
-      const ctx = canvasEl.getContext('2d', { willReadFrequently: true });
-      if (ctx) {
-        canvasEl.height = videoEl.videoHeight;
-        canvasEl.width = videoEl.videoWidth;
-        ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-        
-        const imageData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'dontInvert',
-        });
-        
-        if (code) {
-          this.isScanning = false; // Stop further scanning while processing
-          this.handleQrCodeScan(code.data);
-          return; // Exit the loop
-        }
-      }
-    }
-    
-    requestAnimationFrame(this.tick.bind(this));
-  }
-  
-  private async handleQrCodeScan(qrData: string): Promise<void> {
-    this.scannerLoading.set(true);
-    this.scannerErrorMessage.set(null);
-    this.stopBreakTimer();
-    
-    if (this.scanResultTimer) {
-        clearTimeout(this.scanResultTimer);
-    }
-
-    try {
-        const parsedData = JSON.parse(qrData);
-        if (!parsedData.userId) {
-            throw new Error('Invalid QR code format.');
-        }
-        
-        const { profile, dtrEntry, status } = await this.supabaseService.handleQrCodeLogin(parsedData.userId);
-
-        this.lastScanResult.set({ profile, dtrEntry, status });
-        
-        if (status === 'CLOCK_OUT_BREAK') {
-            this.startBreakTimer();
-        }
-
-        // Hide message and restart scan after 5 seconds
-        this.scanResultTimer = setTimeout(() => {
-            this.lastScanResult.set(null);
-            if (this.isTimeClockModeActive()) {
-                this.isScanning = true;
-                requestAnimationFrame(this.tick.bind(this));
-            }
-        }, 5000);
-
-    } catch (error: any) {
-        this.scannerErrorMessage.set(error.message || 'Failed to process QR code.');
-        // Hide error and restart scan after 5 seconds
-        this.scanResultTimer = setTimeout(() => {
-            this.scannerErrorMessage.set(null);
-            if (this.isTimeClockModeActive()) {
-                this.isScanning = true;
-                requestAnimationFrame(this.tick.bind(this));
-            }
-        }, 5000);
-    } finally {
-        this.scannerLoading.set(false);
-    }
+  // --- Time Clock Mode: Open in New Window ---
+  openTimeClockWindow(): void {
+    // The '/#/time-clock' path is used because the app uses hash-based routing.
+    // The features string specifies the properties of the new window.
+    const features = 'popup,width=1000,height=700,left=100,top=100';
+    window.open('/#/time-clock', 'JeleneTradingTimeClock', features);
   }
 }

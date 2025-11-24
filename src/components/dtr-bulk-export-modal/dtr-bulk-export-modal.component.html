@@ -1,0 +1,148 @@
+@if (visible()) {
+  <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm" (click)="closeModal()">
+    <div class="relative w-full max-w-4xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl m-4 max-h-[90vh] flex flex-col" (click)="$event.stopPropagation()">
+      
+      @switch (modalState()) {
+        @case ('setup') {
+          <div class="p-8">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Bulk Export DTR</h2>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Select a month and year to generate DTRs for the <span class="font-semibold">{{ employeeIds().length }} selected employees</span>.</p>
+            
+            <div class="mt-6 flex flex-col sm:flex-row gap-4">
+              <div class="flex-1">
+                <label for="month-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Month</label>
+                <select id="month-select" [ngModel]="selectedMonth()" (ngModelChange)="selectedMonth.set($event)" class="mt-1 block w-full pl-3 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                  @for (month of months; track month.value) {
+                    <option [value]="month.value">{{ month.name }}</option>
+                  }
+                </select>
+              </div>
+              <div class="flex-1">
+                <label for="year-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Year</label>
+                <select id="year-select" [ngModel]="selectedYear()" (ngModelChange)="selectedYear.set($event)" class="mt-1 block w-full pl-3 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                  @for (year of years; track year) {
+                    <option [value]="year">{{ year }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            <div class="mt-8 flex justify-end gap-3">
+              <button (click)="closeModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600">Cancel</button>
+              <button (click)="generateReport()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700">Generate Reports</button>
+            </div>
+          </div>
+        }
+        @case ('loading') {
+          <div class="flex-grow flex flex-col items-center justify-center p-16 space-y-4">
+            <svg class="animate-spin h-12 w-12 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <p class="text-xl font-semibold text-gray-700 dark:text-gray-300">Generating Reports...</p>
+          </div>
+        }
+        @case ('error') {
+          <div class="flex-grow flex flex-col items-center justify-center p-16 space-y-4 text-center">
+            <h2 class="text-2xl font-bold text-red-600 dark:text-red-400">Error</h2>
+            <p class="text-gray-600 dark:text-gray-400">{{ errorMessage() }}</p>
+            <div class="mt-4 flex gap-3">
+                <button (click)="backToSetup()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600">Back</button>
+                <button (click)="closeModal()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700">Close</button>
+            </div>
+          </div>
+        }
+        @case ('view') {
+          <div class="flex flex-col flex-grow min-h-0">
+            <!-- Action Header -->
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center no-print">
+              <button (click)="backToSetup()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600">Back</button>
+              <div>
+                <button (click)="printReport()" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg shadow-sm hover:bg-green-700 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V4a2 2 0 00-2-2H5zm0 2h10v7H5V4z m2 9a1 1 0 00-1 1v1a1 1 0 102 0v-1a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                  Print All
+                </button>
+              </div>
+            </div>
+
+            <!-- Printable Area -->
+            <div class="overflow-y-auto bg-gray-200 dark:bg-gray-900 flex-grow p-4">
+              <div class="dtr-bulk-print-area max-w-3xl mx-auto space-y-4">
+                @for (report of reports(); track report.employee.id; let isLast = $last) {
+                  <div class="dtr-form-container bg-white dark:bg-gray-800 p-4 font-serif text-black dark:text-white shadow-lg" [class.dtr-page-break]="!isLast">
+                    <!-- Form Header -->
+                    <div class="text-center">
+                      <p class="text-sm">Civil Service Form No. 48</p>
+                      <p class="font-bold text-lg tracking-wider">DAILY TIME RECORD</p>
+                      <p class="text-sm">---o0o---</p>
+                    </div>
+
+                    <!-- Name -->
+                    <div class="text-center mt-4">
+                      <p class="text-lg font-bold border-b border-black inline-block px-8 pb-1">{{ report.employee.first_name }} {{ report.employee.middle_name }} {{ report.employee.last_name }}</p>
+                      <p class="text-xs">(Name)</p>
+                    </div>
+
+                    <!-- Month & Official Hours -->
+                    <div class="flex justify-between mt-4 text-sm">
+                      <div>For the month of <span class="font-bold underline uppercase px-4">{{ monthName() }} {{ selectedYear() }}</span></div>
+                      <div>Official hours: <span class="font-bold underline px-4">{{ report.officialHours }}</span></div>
+                    </div>
+
+                    <!-- Main Table -->
+                    <table class="w-full border-collapse border-2 border-black mt-2 text-sm text-center dtr-table">
+                      <thead>
+                        <tr class="font-bold">
+                          <th rowspan="2" class="p-1 border border-black">Day</th>
+                          <th colspan="2" class="p-1 border-l-2 border-black">A.M.</th>
+                          <th colspan="2" class="p-1 border-l-2 border-black">P.M.</th>
+                          <th colspan="2" class="p-1 border-l-2 border-black">Undertime</th>
+                        </tr>
+                        <tr class="font-bold">
+                          <td class="p-1 border border-black border-t-2">Arrival</td>
+                          <td class="p-1 border border-black border-t-2">Departure</td>
+                          <td class="p-1 border-l-2 border-black">Arrival</td>
+                          <td class="p-1 border border-black">Departure</td>
+                          <td class="p-1 border-l-2 border-black">Hours</td>
+                          <td class="p-1 border border-black">Minutes</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (day of report.dtrData; track day.day) {
+                          <tr>
+                            <td class="p-1 border border-black w-8">{{ day.day }}</td>
+                            <td class="p-1 border-l-2 border-black w-20">{{ day.amArrival }}</td>
+                            <td class="p-1 border border-black w-20">{{ day.amDeparture }}</td>
+                            <td class="p-1 border-l-2 border-black w-20">{{ day.pmArrival }}</td>
+                            <td class="p-1 border border-black w-20">{{ day.pmDeparture }}</td>
+                            <td class="p-1 border-l-2 border-black w-20">{{ day.totalHours }}</td>
+                            <td class="p-1 border border-black w-20"></td>
+                          </tr>
+                        }
+                         <tr>
+                          <td colspan="5" class="p-1 text-right font-bold pr-4">Total</td>
+                          <td class="p-1 border-l-2 border-black"></td>
+                          <td class="p-1 border border-black"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <!-- Certification -->
+                    <div class="mt-2 text-sm px-2 text-center">
+                      <p>I certify on my honor that the above is a true and correct report of the hours of work performed, record of which was made daily at the time of arrival and departure from office.</p>
+                    </div>
+                    
+                    <!-- Signature -->
+                    <div class="flex justify-end mt-8">
+                        <div class="text-center w-64">
+                          <div class="border-t border-black pt-1">In Charge</div>
+                        </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      }
+      
+    </div>
+  </div>
+}
