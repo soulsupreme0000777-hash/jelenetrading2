@@ -1,69 +1,48 @@
-<div class="min-h-screen bg-transparent flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8">
-  <div class="w-full max-w-sm space-y-6">
-    <!-- Branding & Header -->
+<div class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-md space-y-8">
+    <!-- Header -->
     <div class="text-center">
-      <svg class="w-16 h-16 mx-auto text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <h1 class="mt-4 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Jelene Trading</h1>
-      <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-        Sign in to your account to continue.
-      </p>
+      <h1 class="text-5xl font-bold tracking-wider text-white">Jelene Trading</h1>
+      <h2 class="mt-4 text-2xl font-semibold tracking-tight text-gray-200">Sign in to your account</h2>
+      <p class="mt-2 text-sm text-gray-400">Welcome back!</p>
     </div>
 
     <!-- Form Card -->
-    <div class="bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-6 sm:p-8">
-       <!-- Shared Error Message Area -->
+    <div class="bg-slate-900/60 backdrop-blur-md border border-blue-800/50 shadow-2xl shadow-black/30 rounded-2xl p-6 sm:p-8">
+      <!-- Shared Error Message Area -->
       @if (errorMessage()) {
-        <div class="bg-red-100 dark:bg-red-500/20 border border-red-400 dark:border-red-500/30 text-red-700 dark:text-red-300 px-4 py-3 rounded-md relative text-sm mb-6" role="alert">
+        <div class="bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-3 rounded-md relative text-sm mb-6" role="alert">
           <span class="block">{{ errorMessage() }}</span>
         </div>
       }
 
       <form class="space-y-6" [formGroup]="loginForm" (ngSubmit)="onSubmit()">
         <div>
-          <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email address</label>
+          <label for="email" class="block text-sm font-medium text-gray-300 mb-1">Email address</label>
           <div class="relative">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-               <svg class="w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 10-2.636 6.364M16.5 12V8.25" />
+              <svg class="w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
               </svg>
             </div>
-            <input 
-              id="email" 
-              name="email"
-              type="email"
-              formControlName="email"
-              autocomplete="email"
-              required
-              class="w-full pl-10 pr-4 py-2.5 rounded-md bg-gray-100 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-0 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition">
+            <input id="email" name="email" type="email" formControlName="email" autocomplete="email" required class="w-full pl-10 pr-4 py-2.5 rounded-md bg-slate-800/50 border-2 border-blue-800/60 focus:border-violet-500 focus:bg-slate-900 focus:ring-2 focus:ring-violet-500/30 text-white placeholder-gray-400 transition">
           </div>
         </div>
 
         <div>
-          <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+          <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
           <div class="relative">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg class="w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
               </svg>
             </div>
-            <input 
-              id="password" 
-              name="password"
-              type="password"
-              formControlName="password"
-              autocomplete="current-password"
-              required
-              class="w-full pl-10 pr-4 py-2.5 rounded-md bg-gray-100 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-0 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition">
+            <input id="password" name="password" type="password" formControlName="password" autocomplete="current-password" required class="w-full pl-10 pr-4 py-2.5 rounded-md bg-slate-800/50 border-2 border-blue-800/60 focus:border-violet-500 focus:bg-slate-900 focus:ring-2 focus:ring-violet-500/30 text-white placeholder-gray-400 transition">
           </div>
         </div>
         
         <div class="pt-2">
-          <button 
-            type="submit"
-            [disabled]="loading() || loginForm.invalid"
-            class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 focus:ring-blue-500 disabled:bg-blue-500/50 disabled:cursor-not-allowed transition-colors">
+          <button type="submit" [disabled]="loading() || loginForm.invalid" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-lg shadow-violet-500/20 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-violet-500 disabled:bg-violet-500/50 disabled:shadow-none disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02]">
             @if(loading()) {
               <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

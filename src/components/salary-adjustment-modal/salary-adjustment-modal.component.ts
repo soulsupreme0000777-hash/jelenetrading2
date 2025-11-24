@@ -26,7 +26,7 @@ export class SalaryAdjustmentModalComponent {
   // Form Signals
   ruleName = signal('');
   description = signal('');
-  raisePercentage = signal<number | null>(null);
+  raiseAmount = signal<number | null>(null);
   startDate = signal('');
   endDate = signal('');
   isActive = signal(true);
@@ -34,7 +34,7 @@ export class SalaryAdjustmentModalComponent {
   isEditMode = computed(() => !!this.adjustmentToEdit());
   
   isFormValid = computed(() => {
-    return this.ruleName().trim() && this.raisePercentage() !== null && this.raisePercentage()! > 0 && this.startDate() && this.endDate() && this.startDate() <= this.endDate();
+    return this.ruleName().trim() && this.raiseAmount() !== null && this.raiseAmount()! > 0 && this.startDate() && this.endDate() && this.startDate() <= this.endDate();
   });
 
   constructor() {
@@ -45,7 +45,7 @@ export class SalaryAdjustmentModalComponent {
           // Edit mode: populate form
           this.ruleName.set(rule.name);
           this.description.set(rule.description || '');
-          this.raisePercentage.set(rule.raise_percentage);
+          this.raiseAmount.set(rule.raise_amount);
           this.startDate.set(rule.start_date);
           this.endDate.set(rule.end_date);
           this.isActive.set(rule.is_active);
@@ -70,7 +70,7 @@ export class SalaryAdjustmentModalComponent {
       const ruleData = {
         name: this.ruleName(),
         description: this.description(),
-        raise_percentage: this.raisePercentage()!,
+        raise_amount: this.raiseAmount()!,
         start_date: this.startDate(),
         end_date: this.endDate(),
         is_active: this.isActive(),
@@ -106,7 +106,7 @@ export class SalaryAdjustmentModalComponent {
     this.errorMessage.set(null);
     this.ruleName.set('');
     this.description.set('');
-    this.raisePercentage.set(null);
+    this.raiseAmount.set(null);
     this.startDate.set('');
     this.endDate.set('');
     this.isActive.set(true);

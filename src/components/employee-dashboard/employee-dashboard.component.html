@@ -1,4 +1,4 @@
-<div class="flex h-screen bg-gray-100 dark:bg-gray-900 font-sans">
+<div class="flex h-screen bg-transparent font-sans">
   <!-- Mobile Sidebar Backdrop -->
   @if(isSidebarOpen()) {
     <div (click)="isSidebarOpen.set(false)" class="fixed inset-0 bg-black/60 z-10 sm:hidden"></div>
@@ -6,53 +6,53 @@
 
   <!-- Sidebar -->
   <aside 
-    class="w-64 flex-shrink-0 bg-gray-800 dark:bg-gray-900 text-white flex flex-col fixed inset-y-0 left-0 z-20 transform transition-transform duration-300 ease-in-out sm:relative sm:translate-x-0"
+    class="w-64 flex-shrink-0 bg-slate-900/60 backdrop-blur-lg text-white flex flex-col border-r border-blue-800/50 fixed inset-y-0 left-0 z-20 transform transition-transform duration-300 ease-in-out sm:relative sm:translate-x-0"
     [class.-translate-x-full]="!isSidebarOpen()"
     [class.translate-x-0]="isSidebarOpen()">
-    <div class="h-16 flex items-center justify-center px-4 bg-gray-900 dark:bg-black/20">
+    <div class="h-16 flex items-center justify-center px-4 border-b border-blue-800/50">
       <h2 class="text-2xl font-bold text-white tracking-wider">Employee</h2>
     </div>
     <nav class="flex-grow px-2 py-4 space-y-2">
       <button 
         (click)="setActiveTab('profile')"
-        [class.bg-indigo-600]="activeTab() === 'profile'"
-        [class.hover:bg-gray-700]="activeTab() !== 'profile'"
+        [class.bg-violet-600]="activeTab() === 'profile'"
+        [class.hover:bg-white/10]="activeTab() !== 'profile'"
         class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
         <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
         <span class="font-medium">My Profile</span>
       </button>
       <button 
         (click)="setActiveTab('schedule')"
-        [class.bg-indigo-600]="activeTab() === 'schedule'"
-        [class.hover:bg-gray-700]="activeTab() !== 'schedule'"
+        [class.bg-violet-600]="activeTab() === 'schedule'"
+        [class.hover:bg-white/10]="activeTab() !== 'schedule'"
         class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
         <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0h18M12 12.75h.008v.008H12v-.008Z" /></svg>
         <span class="font-medium">My Schedule</span>
       </button>
       <button 
         (click)="setActiveTab('dtr')"
-        [class.bg-indigo-600]="activeTab() === 'dtr'"
-        [class.hover:bg-gray-700]="activeTab() !== 'dtr'"
+        [class.bg-violet-600]="activeTab() === 'dtr'"
+        [class.hover:bg-white/10]="activeTab() !== 'dtr'"
         class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
         <span class="font-medium">Daily Time Record</span>
       </button>
       <button 
         (click)="setActiveTab('payroll')"
-        [class.bg-indigo-600]="activeTab() === 'payroll'"
-        [class.hover:bg-gray-700]="activeTab() !== 'payroll'"
+        [class.bg-violet-600]="activeTab() === 'payroll'"
+        [class.hover:bg-white/10]="activeTab() !== 'payroll'"
         class="w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors duration-200">
         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
         <span class="font-medium">Payroll History</span>
       </button>
     </nav>
-    <div class="p-4 border-t border-gray-700">
+    <div class="p-4 border-t border-blue-800/50">
         @if (logoutError()) {
           <div class="mb-2 p-2 text-xs text-center text-red-200 bg-red-800 rounded-md">
             {{ logoutError() }}
           </div>
         }
-        <button (click)="onLogout()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-300">
+        <button (click)="onLogout()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02]">
           Logout
         </button>
     </div>
@@ -61,10 +61,10 @@
   <!-- Main Content Area -->
   <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Header -->
-    <header class="bg-white dark:bg-gray-800 shadow-md">
+    <header class="bg-slate-900/60 backdrop-blur-lg border-b border-blue-800/50">
       <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex items-center">
         <!-- Hamburger button for mobile -->
-        <button (click)="isSidebarOpen.set(true)" class="sm:hidden p-2 -ml-2 mr-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none">
+        <button (click)="isSidebarOpen.set(true)" class="sm:hidden p-2 -ml-2 mr-2 rounded-md text-gray-400 hover:bg-white/10 focus:outline-none">
           <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
           </svg>
@@ -72,18 +72,18 @@
         
         <div class="flex-1 flex justify-between items-center">
           @switch (activeTab()) {
-            @case ('profile') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1> }
-            @case ('schedule') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Schedule & Leave</h1> }
-            @case ('dtr') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Time Logs</h1> }
-            @case ('payroll') { <h1 class="text-2xl font-bold text-gray-900 dark:text-white">My Payroll History</h1> }
+            @case ('profile') { <h1 class="text-2xl font-bold text-white">My Profile</h1> }
+            @case ('schedule') { <h1 class="text-2xl font-bold text-white">My Schedule & Leave</h1> }
+            @case ('dtr') { <h1 class="text-2xl font-bold text-white">My Time Logs</h1> }
+            @case ('payroll') { <h1 class="text-2xl font-bold text-white">My Payroll History</h1> }
           }
-          <span class="text-sm hidden sm:inline text-gray-700 dark:text-gray-300">Welcome, {{ userEmail() }}</span>
+          <span class="text-sm hidden sm:inline text-gray-300">Welcome, {{ userEmail() }}</span>
         </div>
       </div>
     </header>
 
     <!-- Content -->
-    <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900">
+    <main class="flex-1 overflow-x-hidden overflow-y-auto bg-transparent">
       <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         @switch (activeTab()) {
           @case ('profile') {
@@ -92,7 +92,7 @@
 
                 <!-- Today's Potential Earnings Card -->
                 @if(todaysStatus() !== 'absent' && todaysPotentialEarnings() !== null) {
-                  <div class="p-6 bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400 dark:border-green-500 rounded-md">
+                  <div class="p-6 bg-green-900/20 border-l-4 border-green-500 rounded-2xl">
                     <div class="flex">
                       <div class="flex-shrink-0">
                         <svg class="h-6 w-6 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -101,12 +101,12 @@
                       </div>
                       <div class="ml-4 flex-1 md:flex md:justify-between">
                         <div>
-                          <h3 class="text-lg font-bold text-green-800 dark:text-green-200">Today's Potential Earnings</h3>
-                          <p class="text-sm text-green-700 dark:text-green-300 mt-1">
+                          <h3 class="text-lg font-bold text-green-200">Today's Potential Earnings</h3>
+                          <p class="text-sm text-green-300 mt-1">
                             Based on your daily rate. Final pay is subject to deductions for lateness or undertime.
                           </p>
                         </div>
-                        <p class="mt-2 text-2xl font-bold text-green-900 dark:text-green-100 md:mt-0 md:ml-6">
+                        <p class="mt-2 text-2xl font-bold text-green-100 md:mt-0 md:ml-6">
                           {{ todaysPotentialEarnings() | currency:'PHP' }}
                         </p>
                       </div>
@@ -114,22 +114,22 @@
                   </div>
                 }
 
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                <div class="bg-slate-900/70 backdrop-blur-lg border border-blue-800/50 shadow-lg shadow-black/20 rounded-2xl overflow-hidden">
                   <div class="p-4 sm:p-8">
                     <!-- Profile Header -->
                     <div class="text-center sm:text-left">
-                      <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ profile.first_name }} {{ profile.middle_name }} {{ profile.last_name }}</h2>
-                      <p class="text-md text-indigo-600 dark:text-indigo-400 font-semibold capitalize">{{ profile.position }} @if(profile.branch) { <span class="text-gray-500 dark:text-gray-400 font-normal">- {{ profile.branch }}</span> }</p>
+                      <h2 class="text-2xl font-bold text-white">{{ profile.first_name }} {{ profile.middle_name }} {{ profile.last_name }}</h2>
+                      <p class="text-md text-violet-400 font-semibold capitalize">{{ profile.position }} @if(profile.branch) { <span class="text-gray-400 font-normal">- {{ profile.branch }}</span> }</p>
                     </div>
 
                     <!-- HR Notice -->
-                    <div class="mt-8 p-4 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 dark:border-yellow-500 rounded-md">
+                    <div class="mt-8 p-4 bg-yellow-900/20 border-l-4 border-yellow-500 rounded-md">
                       <div class="flex">
                         <div class="flex-shrink-0">
                            <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 3.001-1.742 3.001H4.42c-1.53 0-2.493-1.667-1.743-3.001l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1.75-4.25a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5z" clip-rule="evenodd" /></svg>
                         </div>
                         <div class="ml-3">
-                           <p class="text-sm text-yellow-700 dark:text-yellow-200">
+                           <p class="text-sm text-yellow-200">
                             To update your personal information, please contact the HR department. All fields are read-only.
                           </p>
                         </div>
@@ -137,41 +137,41 @@
                     </div>
 
                     <!-- Details Grid -->
-                    <div class="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <div class="mt-8 pt-6 border-t border-blue-800/50">
                       <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6">
                         <div class="sm:col-span-2">
-                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Email address</dt>
-                          <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ profile.email }}</dd>
+                          <dt class="text-sm font-medium text-gray-400">Email address</dt>
+                          <dd class="mt-1 text-sm text-white">{{ profile.email }}</dd>
                         </div>
                         <div>
-                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Phone Number</dt>
-                          <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ profile.mobile_number }}</dd>
+                          <dt class="text-sm font-medium text-gray-400">Phone Number</dt>
+                          <dd class="mt-1 text-sm text-white">{{ profile.mobile_number }}</dd>
                         </div>
                         <div>
-                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Hire Date</dt>
-                          <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ profile.hire_date | date:'longDate' }}</dd>
+                          <dt class="text-sm font-medium text-gray-400">Hire Date</dt>
+                          <dd class="mt-1 text-sm text-white">{{ profile.hire_date | date:'longDate' }}</dd>
                         </div>
                         <div>
-                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Age</dt>
-                          <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ profile.age }}</dd>
+                          <dt class="text-sm font-medium text-gray-400">Age</dt>
+                          <dd class="mt-1 text-sm text-white">{{ profile.age }}</dd>
                         </div>
                         <div>
-                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Branch</dt>
-                          <dd class="mt-1 text-sm text-gray-900 dark:text-white capitalize">{{ profile.branch }}</dd>
+                          <dt class="text-sm font-medium text-gray-400">Branch</dt>
+                          <dd class="mt-1 text-sm text-white capitalize">{{ profile.branch }}</dd>
                         </div>
                         <div>
-                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Position</dt>
-                          <dd class="mt-1 text-sm text-gray-900 dark:text-white capitalize">{{ profile.position }}</dd>
+                          <dt class="text-sm font-medium text-gray-400">Position</dt>
+                          <dd class="mt-1 text-sm text-white capitalize">{{ profile.position }}</dd>
                         </div>
                         <div>
-                          <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Daily Rate</dt>
-                          <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ profile.daily_rate | currency:'PHP':'symbol':'1.2-2' }}</dd>
+                          <dt class="text-sm font-medium text-gray-400">Daily Rate</dt>
+                          <dd class="mt-1 text-sm text-white">{{ profile.daily_rate | currency:'PHP':'symbol':'1.2-2' }}</dd>
                         </div>
-                        <div class="sm:col-span-2 pt-4 border-t dark:border-gray-700">
-                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Emergency Leave</dt>
-                            <dd class="mt-1 text-sm text-gray-900 dark:text-white">
-                                <p class="text-gray-600 dark:text-gray-300">Use this for unforeseen emergencies on the current day. This will use one of your available day-off balances.</p>
-                                <button (click)="openEmergencyLeaveConfirmation()" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:bg-orange-400 disabled:cursor-not-allowed">
+                        <div class="sm:col-span-2 pt-4 border-t border-blue-800/50">
+                            <dt class="text-sm font-medium text-gray-400">Emergency Leave</dt>
+                            <dd class="mt-1 text-sm">
+                                <p class="text-gray-300">Use this for unforeseen emergencies on the current day. This will use one of your available day-off balances.</p>
+                                <button (click)="openEmergencyLeaveConfirmation()" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-orange-500 disabled:bg-orange-400/50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02]">
                                   Request Emergency Leave for Today
                                 </button>
                             </dd>
@@ -182,44 +182,44 @@
                 </div>
               </div>
             } @else {
-              <div class="text-center p-8 text-gray-500 dark:text-gray-400">Loading profile...</div>
+              <div class="text-center p-8 text-gray-400">Loading profile...</div>
             }
           }
            @case ('schedule') {
             <div class="px-4 py-6 sm:px-0 space-y-6">
-              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Leave Planner</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Schedule your paid leaves in advance by selecting a leave type and then picking a date on the calendar below.</p>
+              <div class="bg-slate-900/70 backdrop-blur-lg border border-blue-800/50 shadow-lg shadow-black/20 rounded-2xl">
+                <div class="p-6 border-b border-blue-800/50">
+                    <h3 class="text-xl font-bold text-white">Leave Planner</h3>
+                    <p class="text-sm text-gray-400 mt-1">Schedule your paid leaves in advance by selecting a leave type and then picking a date on the calendar below.</p>
                 </div>
                 <div class="p-6">
                   @if (leaveRequestMessage()) {
-                    <div class="mb-4 p-4 rounded-md text-sm" [class.bg-blue-100]="!scheduleError()" [class.text-blue-800]="!scheduleError()" [class.dark:bg-blue-900/30]="!scheduleError()" [class.dark:text-blue-200]="!scheduleError()" [class.bg-red-100]="scheduleError()" [class.text-red-800]="scheduleError()" [class.dark:bg-red-900/30]="scheduleError()" [class.dark:text-red-200]="scheduleError()">
+                    <div class="mb-4 p-4 rounded-md text-sm" [class.bg-blue-900/30]="!scheduleError()" [class.text-blue-200]="!scheduleError()" [class.bg-red-900/30]="scheduleError()" [class.text-red-200]="scheduleError()">
                         {{ leaveRequestMessage() }}
                     </div>
                   }
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     @if(leaveRequestMode() === null) {
-                        <button (click)="startLeaveRequest('day_off')" [disabled]="dayOffBalance() <= 0" class="p-4 bg-cyan-500 text-white rounded-lg shadow-md hover:bg-cyan-600 disabled:bg-cyan-300 dark:disabled:bg-cyan-800 disabled:cursor-not-allowed transition-colors">
+                        <button (click)="startLeaveRequest('day_off')" [disabled]="dayOffBalance() <= 0" class="p-4 bg-cyan-500 text-white rounded-lg shadow-md hover:bg-cyan-600 disabled:bg-cyan-800 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02]">
                             Schedule Day Off(s) ({{ dayOffBalance() }} left)
                         </button>
-                        <button (click)="startLeaveRequest('sil')" [disabled]="!isEligibleForSIL() || silBalance() <= 0" class="p-4 bg-purple-500 text-white rounded-lg shadow-md hover:bg-purple-600 disabled:bg-purple-300 dark:disabled:bg-purple-800 disabled:cursor-not-allowed transition-colors">
+                        <button (click)="startLeaveRequest('sil')" [disabled]="!isEligibleForSIL() || silBalance() <= 0" class="p-4 bg-purple-500 text-white rounded-lg shadow-md hover:bg-purple-600 disabled:bg-purple-800 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02]">
                             Schedule 5-Day SIL ({{ isEligibleForSIL() && silBalance() > 0 ? 'Available' : 'Used/N/A' }})
                         </button>
                     } @else if (leaveRequestMode() === 'day_off') {
                         <div class="md:col-span-2">
-                          <button (click)="openDayOffConfirmation()" [disabled]="selectedLeaveDates().size === 0" class="w-full p-4 bg-green-500 text-white rounded-lg shadow-md hover:bg-green-600 disabled:bg-green-300 dark:disabled:bg-green-700 disabled:cursor-not-allowed transition-colors">
+                          <button (click)="openDayOffConfirmation()" [disabled]="selectedLeaveDates().size === 0" class="w-full p-4 bg-green-500 text-white rounded-lg shadow-md hover:bg-green-600 disabled:bg-green-700 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02]">
                             Confirm {{ selectedLeaveDates().size }} Selected Day(s)
                           </button>
                         </div>
-                        <button (click)="cancelLeaveRequest()" class="w-full p-4 bg-gray-500 text-white rounded-lg shadow-md hover:bg-gray-600 transition-colors">
+                        <button (click)="cancelLeaveRequest()" class="w-full p-4 bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-700 transition-all duration-200 transform hover:scale-[1.02]">
                           Cancel
                         </button>
                     } @else if (leaveRequestMode() === 'sil') {
-                        <div class="md:col-span-2 flex items-center justify-center p-4 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
-                          <p class="text-purple-800 dark:text-purple-200 text-center">Select a start date on the calendar for your 5-day leave.</p>
+                        <div class="md:col-span-2 flex items-center justify-center p-4 bg-purple-900/50 rounded-lg">
+                          <p class="text-purple-200 text-center">Select a start date on the calendar for your 5-day leave.</p>
                         </div>
-                        <button (click)="cancelLeaveRequest()" class="w-full p-4 bg-gray-500 text-white rounded-lg shadow-md hover:bg-gray-600 transition-colors">
+                        <button (click)="cancelLeaveRequest()" class="w-full p-4 bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-700 transition-all duration-200 transform hover:scale-[1.02]">
                           Cancel
                         </button>
                     }
@@ -227,44 +227,40 @@
                 </div>
               </div>
 
-              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                  <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{ currentDate() | date:'MMMM yyyy' }}</h3>
+              <div class="bg-slate-900/70 backdrop-blur-lg border border-blue-800/50 shadow-lg shadow-black/20 rounded-2xl">
+                <div class="p-6 border-b border-blue-800/50 flex items-center justify-between">
+                  <h3 class="text-xl font-bold text-white">{{ currentDate() | date:'MMMM yyyy' }}</h3>
                   <div class="flex items-center space-x-2">
-                    <button (click)="previousMonth()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-                      <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+                    <button (click)="previousMonth()" class="p-2 rounded-full hover:bg-white/10">
+                      <svg class="w-5 h-5 text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
                     </button>
-                    <button (click)="nextMonth()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-                      <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+                    <button (click)="nextMonth()" class="p-2 rounded-full hover:bg-white/10">
+                      <svg class="w-5 h-5 text-gray-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
                     </button>
                   </div>
                 </div>
                  @if(scheduleLoading()) {
-                  <p class="text-center p-8 text-gray-500 dark:text-gray-400">Loading your schedule...</p>
+                  <p class="text-center p-8 text-gray-400">Loading your schedule...</p>
                  } @else if(scheduleError()) {
-                  <p class="text-center p-8 text-red-500 dark:text-red-400">{{ scheduleError() }}</p>
+                  <p class="text-center p-8 text-red-400">{{ scheduleError() }}</p>
                  } @else {
                   <div class="p-1 sm:p-2">
                     <div class="grid grid-cols-7 gap-px">
                       @for(day of ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; track day) {
-                        <div class="text-center text-xs font-semibold text-gray-500 dark:text-gray-400 py-2">{{day}}</div>
+                        <div class="text-center text-xs font-semibold text-gray-400 py-2">{{day}}</div>
                       }
                       @for(day of calendarDays(); track day.dateStr) {
-                        <div class="relative min-h-[90px] sm:min-h-[100px] p-1 sm:p-2 border-t border-l border-gray-200 dark:border-gray-700"
-                            [class.bg-white]="day.isCurrentMonth"
-                            [class.dark:bg-gray-800]="day.isCurrentMonth"
-                            [class.bg-gray-50]="!day.isCurrentMonth"
-                            [class.dark:bg-gray-800/50]="!day.isCurrentMonth"
-                            [class.text-gray-400]="!day.isCurrentMonth"
-                            [class.dark:text-gray-500]="!day.isCurrentMonth"
-                            [class.cursor-pointer]="leaveRequestMode()" [class.hover:bg-indigo-100]="leaveRequestMode()" [class.dark:hover:bg-indigo-900/50]="leaveRequestMode()"
-                            [class.bg-blue-200]="leaveRequestMode() === 'day_off' && selectedLeaveDates().has(day.dateStr)"
-                            [class.dark:bg-blue-700]="leaveRequestMode() === 'day_off' && selectedLeaveDates().has(day.dateStr)"
+                        <div class="relative min-h-[90px] sm:min-h-[100px] p-1 sm:p-2 border-t border-l border-blue-800/50"
+                            [class.bg-slate-900]="day.isCurrentMonth"
+                            [class.bg-slate-800/50]="!day.isCurrentMonth"
+                            [class.text-gray-500]="!day.isCurrentMonth"
+                            [class.cursor-pointer]="leaveRequestMode()" [class.hover:bg-violet-900/50]="leaveRequestMode()"
+                            [class.bg-blue-700]="leaveRequestMode() === 'day_off' && selectedLeaveDates().has(day.dateStr)"
                             (click)="handleDayClick(day)">
                           <time [attr.datetime]="day.date | date:'yyyy-MM-dd'" 
                                 class="font-semibold"
                                 [class.text-white]="day.isToday"
-                                [class.bg-indigo-600]="day.isToday"
+                                [class.bg-violet-600]="day.isToday"
                                 [class.rounded-full]="day.isToday"
                                 [class.w-6]="day.isToday"
                                 [class.h-6]="day.isToday"
@@ -274,21 +270,21 @@
                             {{ day.dayOfMonth }}
                           </time>
                           @if(day.schedule) {
-                            <div class="mt-1 p-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-md text-xs text-center">
+                            <div class="mt-1 p-1 bg-indigo-900/50 text-indigo-300 rounded-md text-xs text-center">
                               {{day.schedule}}
                             </div>
                           } @else if(!day.leaveType && day.isCurrentMonth) {
-                             <div class="mt-1 p-1 bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 rounded-md text-xs text-center">
+                             <div class="mt-1 p-1 bg-gray-700/50 text-gray-400 rounded-md text-xs text-center">
                               No Schedule
                             </div>
                           }
 
                           @if (day.leaveType === 'day_off') {
-                              <div class="mt-1 p-1 bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300 rounded-md text-xs text-center font-semibold">Day Off</div>
+                              <div class="mt-1 p-1 bg-cyan-900/50 text-cyan-300 rounded-md text-xs text-center font-semibold">Day Off</div>
                           } @else if (day.leaveType === 'service_incentive_leave') {
-                              <div class="mt-1 p-1 bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-md text-xs text-center font-semibold">SIL</div>
+                              <div class="mt-1 p-1 bg-purple-900/50 text-purple-300 rounded-md text-xs text-center font-semibold">SIL</div>
                           } @else if (day.leaveType === 'emergency_leave') {
-                              <div class="mt-1 p-1 bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 rounded-md text-xs text-center font-semibold">Emergency</div>
+                              <div class="mt-1 p-1 bg-orange-900/50 text-orange-300 rounded-md text-xs text-center font-semibold">Emergency</div>
                           }
                         </div>
                       }
@@ -301,46 +297,46 @@
           @case ('dtr') {
             <div class="px-4 py-6 sm:px-0 space-y-8">
               @if (dtrError()) {
-                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg" role="alert">
+                <div class="bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg" role="alert">
                     <strong class="font-bold">Error:</strong>
                     <span class="block sm:inline ml-2">{{ dtrError() }}</span>
                 </div>
               }
 
               <!-- Time Log History -->
-              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                  <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                      <h3 class="text-xl font-bold text-gray-900 dark:text-white">Time Log History</h3>
+              <div class="bg-slate-900/70 backdrop-blur-lg border border-blue-800/50 shadow-lg shadow-black/20 rounded-2xl">
+                  <div class="p-6 border-b border-blue-800/50">
+                      <h3 class="text-xl font-bold text-white">Time Log History</h3>
                   </div>
                   <div class="p-4 sm:p-6">
                     @if(dtrLoading()) {
-                      <p class="text-center text-gray-500 dark:text-gray-400">Loading your time log...</p>
+                      <p class="text-center text-gray-400">Loading your time log...</p>
                     } @else if (dtrHistory().length === 0) {
-                      <p class="text-center text-gray-500 dark:text-gray-400">You have no time entries yet.</p>
+                      <p class="text-center text-gray-400">You have no time entries yet.</p>
                     } @else {
                       <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 md:table">
-                          <thead class="bg-gray-50 dark:bg-gray-700 hidden md:table-header-group">
+                        <table class="min-w-full divide-y divide-blue-800/50 md:table">
+                          <thead class="bg-slate-800/50 hidden md:table-header-group">
                             <tr>
-                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Clock In</th>
-                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Clock Out</th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Date</th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Clock In</th>
+                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Clock Out</th>
                             </tr>
                           </thead>
-                          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                          <tbody class="divide-y divide-blue-800/50">
                             @for(entry of dtrHistory(); track entry.id) {
-                              <tr class="block md:table-row">
+                              <tr class="block md:table-row hover:bg-white/5">
                                 <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm font-medium md:table-cell block">
-                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Date: </span>
-                                  <span class="text-gray-900 dark:text-white">{{ entry.time_in | date:'longDate' }}</span>
+                                  <span class="font-bold text-gray-400 md:hidden">Date: </span>
+                                  <span class="text-white">{{ entry.time_in | date:'longDate' }}</span>
                                 </td>
                                 <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
-                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Clock In: </span>
-                                  <span class="text-green-600 dark:text-green-400 font-semibold">{{ entry.time_in | date:'mediumTime' }}</span>
+                                  <span class="font-bold text-gray-400 md:hidden">Clock In: </span>
+                                  <span class="text-green-400 font-semibold">{{ entry.time_in | date:'mediumTime' }}</span>
                                 </td>
                                 <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
-                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Clock Out: </span>
-                                  @if(entry.time_out) { <span class="text-red-600 dark:text-red-400 font-semibold">{{ entry.time_out | date:'mediumTime' }}</span> } 
+                                  <span class="font-bold text-gray-400 md:hidden">Clock Out: </span>
+                                  @if(entry.time_out) { <span class="text-red-400 font-semibold">{{ entry.time_out | date:'mediumTime' }}</span> } 
                                   @else { <span class="text-gray-500">In Progress</span> }
                                 </td>
                               </tr>
@@ -355,101 +351,98 @@
           }
            @case ('payroll') {
             <div class="px-4 py-6 sm:px-0">
-              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Payroll History</h3>
+              <div class="bg-slate-900/70 backdrop-blur-lg border border-blue-800/50 shadow-lg shadow-black/20 rounded-2xl">
+                <div class="p-6 border-b border-blue-800/50">
+                    <h3 class="text-xl font-bold text-white">Payroll History</h3>
                 </div>
                 <div class="p-4 sm:p-6">
                   @if(payrollsLoading()) {
-                    <p class="text-center text-gray-500 dark:text-gray-400">Loading your payroll history...</p>
+                    <p class="text-center text-gray-400">Loading your payroll history...</p>
                   } @else if (payrollsError()) {
-                    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
+                    <div class="bg-red-500/20 border-l-4 border-red-500 text-red-300 p-4" role="alert">
                       <p class="font-bold">Error</p>
                       <p>{{ payrollsError() }}</p>
                     </div>
                   } @else if (payrolls().length === 0) {
-                     <p class="text-center text-gray-500 dark:text-gray-400">No payroll records have been generated for you yet.</p>
+                     <p class="text-center text-gray-400">No payroll records have been generated for you yet.</p>
                   } @else {
                     <div class="overflow-x-auto">
-                      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 md:table">
-                        <thead class="bg-gray-50 dark:bg-gray-700 hidden md:table-header-group">
+                      <table class="min-w-full divide-y divide-blue-800/50 md:table">
+                        <thead class="bg-slate-800/50 hidden md:table-header-group">
                           <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Pay Period</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Gross Pay</th>
-                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Deductions</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Net Pay</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Pay Period</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Gross Pay</th>
+                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Total Deductions</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Net Pay</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
                           </tr>
                         </thead>
-                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        <tbody class="divide-y divide-blue-800/50">
                           @for(p of payrolls(); track p.id) {
-                            <tr class="block md:table-row cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50" (click)="togglePayrollDetails(p.id)">
-                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 md:table-cell block">
-                                  <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Period: </span>
+                            <tr class="block md:table-row cursor-pointer hover:bg-white/5" (click)="togglePayrollDetails(p.id)">
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm text-gray-400 md:table-cell block">
+                                  <span class="font-bold text-gray-400 md:hidden">Period: </span>
                                   {{ p.pay_period_start | date:'mediumDate' }} to {{ p.pay_period_end | date:'mediumDate' }}
                               </td>
-                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 md:table-cell block">
-                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Gross Pay: </span>
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm text-gray-400 md:table-cell block">
+                                <span class="font-bold text-gray-400 md:hidden">Gross Pay: </span>
                                 {{ p.gross_pay | currency:'PHP' }}
                               </td>
-                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm text-red-500 dark:text-red-400 md:table-cell block">
-                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Deductions: </span>
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm text-red-400 md:table-cell block">
+                                <span class="font-bold text-gray-400 md:hidden">Deductions: </span>
                                 {{ (p.lateness_deductions + p.undertime_deductions + p.manual_deductions) | currency:'PHP' }}
                               </td>
-                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm font-bold text-gray-700 dark:text-gray-200 md:table-cell block">
-                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden">Net Pay: </span>
+                              <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm font-bold text-gray-200 md:table-cell block">
+                                <span class="font-bold text-gray-400 md:hidden">Net Pay: </span>
                                 {{ p.net_pay | currency:'PHP' }}
                               </td>
                               <td class="px-6 py-2 md:py-4 whitespace-nowrap text-sm md:table-cell block">
-                                <span class="font-bold text-gray-500 dark:text-gray-400 md:hidden mb-1 block">Status: </span>
+                                <span class="font-bold text-gray-400 md:hidden mb-1 block">Status: </span>
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                                  [class.bg-yellow-100]="p.status === 'Delayed'" [class.text-yellow-800]="p.status === 'Delayed'"
-                                  [class.dark:bg-yellow-900/50]="p.status === 'Delayed'" [class.dark:text-yellow-300]="p.status === 'Delayed'"
-                                  [class.bg-red-100]="p.status === 'Unpaid'" [class.text-red-800]="p.status === 'Unpaid'"
-                                  [class.dark:bg-red-900/50]="p.status === 'Unpaid'" [class.dark:text-red-300]="p.status === 'Unpaid'"
-                                  [class.bg-green-100]="p.status === 'Paid'" [class.text-green-800]="p.status === 'Paid'"
-                                  [class.dark:bg-green-900/50]="p.status === 'Paid'" [class.dark:text-green-300]="p.status === 'Paid'">
+                                  [class.bg-yellow-900/50]="p.status === 'Delayed'" [class.text-yellow-300]="p.status === 'Delayed'"
+                                  [class.bg-red-900/50]="p.status === 'Unpaid'" [class.text-red-300]="p.status === 'Unpaid'"
+                                  [class.bg-green-900/50]="p.status === 'Paid'" [class.text-green-300]="p.status === 'Paid'">
                                   {{ p.status }}
                                 </span>
                               </td>
                             </tr>
                             @if (expandedPayrollId() === p.id) {
-                              <tr class="block md:table-row bg-gray-50 dark:bg-gray-900/50">
+                              <tr class="block md:table-row bg-slate-800/50">
                                 <td colspan="5" class="p-4 md:p-6 block md:table-cell">
-                                  <h4 class="text-md font-semibold text-gray-800 dark:text-gray-200 mb-4">Calculation Breakdown</h4>
-                                  <dl class="space-y-3 p-4 bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700">
+                                  <h4 class="text-md font-semibold text-gray-200 mb-4">Calculation Breakdown</h4>
+                                  <dl class="space-y-3 p-4 bg-slate-900 rounded-lg border border-blue-800/50">
                                     <div class="flex justify-between items-center">
-                                      <dt class="text-sm text-gray-600 dark:text-gray-400">Gross Pay</dt>
-                                      <dd class="text-sm font-medium text-gray-900 dark:text-white">{{ p.gross_pay | currency:'PHP' }}</dd>
+                                      <dt class="text-sm text-gray-400">Gross Pay</dt>
+                                      <dd class="text-sm font-medium text-white">{{ p.gross_pay | currency:'PHP' }}</dd>
                                     </div>
                                     @if(p.raise_details && p.raise_details.length > 0) {
                                       @for(raise of p.raise_details; track raise.name) {
                                         <div class="flex justify-between items-center">
-                                          <dt class="text-sm text-gray-600 dark:text-gray-400">{{ raise.name }}</dt>
-                                          <dd class="text-sm font-medium text-green-600 dark:text-green-400">+ {{ raise.amount | currency:'PHP' }}</dd>
+                                          <dt class="text-sm text-gray-400">{{ raise.name }}</dt>
+                                          <dd class="text-sm font-medium text-green-400">+ {{ raise.amount | currency:'PHP' }}</dd>
                                         </div>
                                       }
                                     } @else if (p.salary_raise > 0) {
                                       <div class="flex justify-between items-center">
-                                        <dt class="text-sm text-gray-600 dark:text-gray-400">Salary Raise</dt>
-                                        <dd class="text-sm font-medium text-green-600 dark:text-green-400">+ {{ p.salary_raise | currency:'PHP' }}</dd>
+                                        <dt class="text-sm text-gray-400">Salary Raise</dt>
+                                        <dd class="text-sm font-medium text-green-400">+ {{ p.salary_raise | currency:'PHP' }}</dd>
                                       </div>
                                     }
                                     <div class="flex justify-between items-center">
-                                      <dt class="text-sm text-gray-600 dark:text-gray-400">Lateness Deductions <span class="text-xs">({{ p.lateness_minutes }} mins)</span></dt>
-                                      <dd class="text-sm font-medium text-red-600 dark:text-red-400">- {{ p.lateness_deductions | currency:'PHP' }}</dd>
+                                      <dt class="text-sm text-gray-400">Lateness Deductions <span class="text-xs">({{ p.lateness_minutes }} mins)</span></dt>
+                                      <dd class="text-sm font-medium text-red-400">- {{ p.lateness_deductions | currency:'PHP' }}</dd>
                                     </div>
                                     <div class="flex justify-between items-center">
-                                      <dt class="text-sm text-gray-600 dark:text-gray-400">Undertime Deductions <span class="text-xs">({{ p.undertime_minutes }} mins)</span></dt>
-                                      <dd class="text-sm font-medium text-red-600 dark:text-red-400">- {{ p.undertime_deductions | currency:'PHP' }}</dd>
+                                      <dt class="text-sm text-gray-400">Undertime Deductions <span class="text-xs">({{ p.undertime_minutes }} mins)</span></dt>
+                                      <dd class="text-sm font-medium text-red-400">- {{ p.undertime_deductions | currency:'PHP' }}</dd>
                                     </div>
                                     <div class="flex justify-between items-center">
-                                      <dt class="text-sm text-gray-600 dark:text-gray-400">Manual Deductions</dt>
-                                      <dd class="text-sm font-medium text-red-600 dark:text-red-400">- {{ p.manual_deductions | currency:'PHP' }}</dd>
+                                      <dt class="text-sm text-gray-400">Manual Deductions</dt>
+                                      <dd class="text-sm font-medium text-red-400">- {{ p.manual_deductions | currency:'PHP' }}</dd>
                                     </div>
-                                    <div class="flex justify-between items-center pt-3 border-t border-gray-200 dark:border-gray-700">
-                                      <dt class="text-lg font-bold text-gray-900 dark:text-white">Net Pay</dt>
-                                      <dd class="text-lg font-bold text-indigo-600 dark:text-indigo-400">{{ p.net_pay | currency:'PHP' }}</dd>
+                                    <div class="flex justify-between items-center pt-3 border-t border-blue-800/50">
+                                      <dt class="text-lg font-bold text-white">Net Pay</dt>
+                                      <dd class="text-lg font-bold text-violet-400">{{ p.net_pay | currency:'PHP' }}</dd>
                                     </div>
                                   </dl>
                                 </td>

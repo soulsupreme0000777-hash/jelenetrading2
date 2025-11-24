@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, signal, effect, computed, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
-import { SupabaseService, Profile, DtrEntry, Payroll, EmployeeStatus, EmployeeSchedule, SalaryRule, CompanySetting, Position } from '../../services/supabase.service';
+import { SupabaseService, Profile, DtrEntry, Payroll, EmployeeStatus, EmployeeSchedule, SalaryRule, CompanySetting, Position, Branch, PositionRate } from '../../services/supabase.service';
 import { AddEmployeeModalComponent } from '../add-employee-modal/add-employee-modal.component';
 import { RunPayrollModalComponent } from '../run-payroll-modal/run-payroll-modal.component';
 import { ConfirmationModalComponent } from '../confirmation-modal/confirmation-modal.component';
@@ -165,7 +165,9 @@ export class AdminDashboardComponent implements OnDestroy {
   
   isAllEmployeesSelected = computed(() => {
     const filtered = this.filteredEmployees();
-    return filtered.length > 0 && this.selectedEmployees().size === filtered.length;
+    const selected = this.selectedEmployees();
+    if (filtered.length === 0) return false;
+    return filtered.every(emp => selected.has(emp.id));
   });
 
   selectedEmployeeIdsArray = computed(() => [...this.selectedEmployees()]);
@@ -243,7 +245,7 @@ export class AdminDashboardComponent implements OnDestroy {
                 cellStatus = 'Leave';
             } else if (schedule) {
                 if (dailyDtr.length > 0) {
-                    const expectedStart = new Date(`${day.dateStr}T${schedule.work_start_time}`);
+                    const expectedStart = new Date(`${day.dateStr}T${schedule.work_start_time}Z`);
                     const actualStart = new Date(dailyDtr[0].time_in!);
                     cellStatus = (actualStart.getTime() - expectedStart.getTime()) / 60000 > gracePeriod ? 'Late' : 'Present';
 
@@ -400,6 +402,9 @@ export class AdminDashboardComponent implements OnDestroy {
   // --- Manage Payroll Signals ---
   settingsLoading = signal(true);
   positions = signal<Position[]>([]);
+  branches = signal<Branch[]>([]);
+  positionRates = signal<PositionRate[]>([]);
+  positionRatesModel = signal<Record<number, Record<number, number | null>>>({});
   payrollSettings = signal<PayrollSettings>({
     late_rate_per_minute: 1.60,
     grace_period_minutes: 15,
@@ -610,6 +615,7 @@ export class AdminDashboardComponent implements OnDestroy {
   setActiveTab(tab: AdminTab): void {
     this.activeTab.set(tab);
     this.selectedEmployees.set(new Set()); // Clear selection when changing tabs
+    this.isMultiSelectMode.set(false); // Also exit multi-select mode
   }
 
   async loadEmployees(): Promise<void> {
@@ -687,15 +693,26 @@ export class AdminDashboardComponent implements OnDestroy {
     this.settingsLoading.set(true);
     this.salaryRulesLoading.set(true);
     try {
-        const [settingsRes, rulesRes, positionsRes] = await Promise.all([
+        const [settingsRes, rulesRes, positionsRes, branchesRes, ratesRes] = await Promise.all([
             this.supabaseService.getCompanySettings(),
             this.supabaseService.getAllSalaryRules(),
-            this.supabaseService.getPositions()
+            this.supabaseService.getPositions(),
+            this.supabaseService.getBranches(),
+            this.supabaseService.getPositionRates(),
         ]);
 
         if (settingsRes.error) throw settingsRes.error;
         if (rulesRes.error) throw rulesRes.error;
         if (positionsRes.error) throw positionsRes.error;
+        if (branchesRes.error) throw branchesRes.error;
+        if (ratesRes.error) throw ratesRes.error;
+
+        const positionsData = positionsRes.data || [];
+        const branchesData = branchesRes.data || [];
+        const ratesData = ratesRes.data || [];
+        this.positions.set(positionsData);
+        this.branches.set(branchesData);
+        this.positionRates.set(ratesData);
 
         // Process company settings
         const settingsData = settingsRes.data || [];
@@ -703,7 +720,16 @@ export class AdminDashboardComponent implements OnDestroy {
             const newSettings: PayrollSettings = { ...currentSettings };
             settingsData.forEach(s => {
                 if (s.setting_key in newSettings) {
-                    (newSettings as any)[s.setting_key] = s.setting_value;
+                    if (s.setting_key === 'birth_month_bonus' && typeof s.setting_value === 'string') {
+                        try {
+                            newSettings.birth_month_bonus = JSON.parse(s.setting_value);
+                        } catch (e) {
+                            console.error('Error parsing birth_month_bonus setting:', e);
+                            newSettings.birth_month_bonus = {};
+                        }
+                    } else {
+                        (newSettings as any)[s.setting_key] = s.setting_value;
+                    }
                 }
             });
             return newSettings;
@@ -712,8 +738,17 @@ export class AdminDashboardComponent implements OnDestroy {
         // Process salary rules
         this.salaryRules.set(rulesRes.data || []);
 
-        // Process positions for bonus form
-        this.positions.set(positionsRes.data || []);
+        // Build model for position rates form
+        const model: Record<number, Record<number, number | null>> = {};
+        positionsData.forEach(p => {
+          model[p.id] = {};
+          branchesData.forEach(b => {
+            const rate = ratesData.find(r => r.position_id === p.id && r.branch_id === b.id);
+            model[p.id][b.id] = rate ? rate.daily_rate : null;
+          });
+        });
+        this.positionRatesModel.set(model);
+
 
     } catch (e: any) {
         let message = e.message || 'An unknown error occurred.';
@@ -742,6 +777,36 @@ export class AdminDashboardComponent implements OnDestroy {
     }
   }
 
+  async savePositionRates(): Promise<void> {
+    const model = this.positionRatesModel();
+    const ratesToUpsert: Omit<PositionRate, 'id'>[] = [];
+    for (const posId in model) {
+      for (const braId in model[posId]) {
+        const rate = model[posId][braId];
+        if (rate !== null && rate >= 0) {
+          ratesToUpsert.push({
+            position_id: +posId,
+            branch_id: +braId,
+            daily_rate: rate,
+          });
+        }
+      }
+    }
+
+    try {
+      const { error: upsertError } = await this.supabaseService.upsertPositionRates(ratesToUpsert);
+      if (upsertError) throw upsertError;
+
+      const { error: rpcError } = await this.supabaseService.updateAllEmployeeDailyRates();
+      if (rpcError) throw rpcError;
+      
+      this.showNotification('success', 'Daily rates saved and applied to employees.');
+      this.loadPayrollSettings(); // Reload to confirm
+      this.loadEmployees(); // Reload employees to get updated rates
+    } catch (e: any) {
+      this.showNotification('error', `Failed to save daily rates: ${e.message}`);
+    }
+  }
   
   openAddSalaryRuleModal(): void {
     this.adjustmentToEdit.set(null);
@@ -1047,12 +1112,13 @@ export class AdminDashboardComponent implements OnDestroy {
   }
 
   toggleAllEmployeeSelection(): void {
-    const allSelected = this.isAllEmployeesSelected();
+    const shouldSelectAll = !this.isAllEmployeesSelected();
     const filteredIds = new Set(this.filteredEmployees().map(e => e.id));
-    if (allSelected) {
-      this.selectedEmployees.set(new Set());
-    } else {
+    
+    if (shouldSelectAll) {
       this.selectedEmployees.set(filteredIds);
+    } else {
+      this.selectedEmployees.set(new Set());
     }
   }
 

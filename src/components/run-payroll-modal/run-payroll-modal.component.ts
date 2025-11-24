@@ -159,7 +159,7 @@ export class RunPayrollModalComponent {
             const timeIn2 = dailyEntries[1]?.time_in ? new Date(dailyEntries[1].time_in) : null;
             const timeOut2 = dailyEntries[1]?.time_out ? new Date(dailyEntries[1].time_out) : null;
             
-            const expectedEnd = new Date(`${dateKey}T${schedule.work_end_time}+08:00`);
+            const expectedEnd = new Date(`${dateKey}T${schedule.work_end_time}Z`);
             const ONE_HOUR_MS = 3600 * 1000;
 
             if (timeIn1 && !timeOut1 && !timeIn2 && !timeOut2) {
@@ -178,7 +178,7 @@ export class RunPayrollModalComponent {
             const dailyWorkDurationHours = dailyWorkDurationMs / (1000 * 60 * 60);
             totalHoursInPeriod += dailyWorkDurationHours;
 
-            const expectedStart = new Date(`${dateKey}T${schedule.work_start_time}+08:00`);
+            const expectedStart = new Date(`${dateKey}T${schedule.work_start_time}Z`);
 
             const timeIn = new Date(dailyEntries[0].time_in!);
             const minutesLate = (timeIn.getTime() - expectedStart.getTime()) / (1000 * 60);
@@ -197,7 +197,7 @@ export class RunPayrollModalComponent {
               const ruleStart = new Date(rule.start_date);
               const ruleEnd = new Date(rule.end_date);
               if (day >= ruleStart && day <= ruleEnd) {
-                const raiseAmount = emp.daily_rate * (rule.raise_percentage / 100);
+                const raiseAmount = rule.raise_amount;
                 salaryRaise += raiseAmount;
 
                 const existingRaise = raiseDetails.find(r => r.name === rule.name);

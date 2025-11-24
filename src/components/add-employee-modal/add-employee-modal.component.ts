@@ -6,8 +6,6 @@ import { ConfirmationModalComponent } from '../confirmation-modal/confirmation-m
 
 type ModalState = 'form' | 'loading' | 'success' | 'error';
 
-declare var Cropper: any;
-
 @Component({
   selector: 'app-add-employee-modal',
   templateUrl: './add-employee-modal.component.html',
@@ -56,12 +54,6 @@ export class AddEmployeeModalComponent {
   
   isConfirmCancelVisible = signal(false);
   private initialFormState = signal<Partial<Profile & { password?: string, confirmPassword?: string }>>({});
-  
-  // Image Cropper State
-  isCropperVisible = signal(false);
-  cropperImage = viewChild<ElementRef<HTMLImageElement>>('cropperImage');
-  private cropper: any | null = null;
-  private originalFile: File | null = null;
   
   age = computed<number | null>(() => {
     const birthDateStr = this.birthDate();
@@ -164,26 +156,6 @@ export class AddEmployeeModalComponent {
         }
       }
     });
-
-    effect(() => {
-      const cropperImageEl = this.cropperImage()?.nativeElement;
-      if (this.isCropperVisible() && cropperImageEl && this.originalFile) {
-        if (this.cropper) {
-            this.cropper.destroy();
-        }
-        cropperImageEl.src = URL.createObjectURL(this.originalFile);
-        this.cropper = new Cropper(cropperImageEl, {
-            aspectRatio: 1,
-            viewMode: 1,
-            background: false,
-            responsive: true,
-            checkOrientation: false,
-            movable: true,
-            zoomable: true,
-            scalable: true,
-        });
-      }
-    });
   }
 
   async loadDynamicData() {
@@ -217,38 +189,13 @@ export class AddEmployeeModalComponent {
         this.errorMessage.set('Invalid file type. Only JPG, PNG, and WEBP are allowed.');
         return;
       }
-      this.originalFile = file;
-      this.isCropperVisible.set(true);
+      
+      this.selectedFile.set(file);
+      this.avatarPreviewUrl.set(URL.createObjectURL(file));
       this.errorMessage.set(null); // Clear previous errors
+
       input.value = ''; // Reset input so the same file can be chosen again
     }
-  }
-
-  saveCroppedImage(): void {
-    if (!this.cropper || !this.originalFile) return;
-    this.cropper.getCroppedCanvas({
-        width: 512,
-        height: 512,
-        imageSmoothingQuality: 'high',
-    }).toBlob((blob: Blob | null) => {
-        if (blob) {
-            const fileExtension = this.originalFile!.name.split('.').pop() || 'png';
-            const mimeType = this.originalFile!.type;
-            const croppedFile = new File([blob], `avatar.${fileExtension}`, { type: mimeType });
-            this.selectedFile.set(croppedFile);
-            this.avatarPreviewUrl.set(URL.createObjectURL(croppedFile));
-        }
-        this.closeCropper();
-    });
-  }
-
-  closeCropper(): void {
-    this.isCropperVisible.set(false);
-    if (this.cropper) {
-        this.cropper.destroy();
-        this.cropper = null;
-    }
-    this.originalFile = null;
   }
 
   private populateForm(employee: Profile): void {
@@ -461,6 +408,5 @@ export class AddEmployeeModalComponent {
     this.selectedRole.set('employee');
     this.avatarPreviewUrl.set(null);
     this.selectedFile.set(null);
-    this.closeCropper();
   }
 }

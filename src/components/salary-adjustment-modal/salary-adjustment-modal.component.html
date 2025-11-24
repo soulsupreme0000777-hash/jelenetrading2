@@ -1,4 +1,5 @@
 
+
 @if (visible()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm" (click)="closeModal()">
     <div class="relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl m-4" (click)="$event.stopPropagation()">
@@ -44,8 +45,8 @@
             </div>
             
             <div>
-              <label for="raisePercentage" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Salary Raise Percentage (%)</label>
-              <input type="number" id="raisePercentage" [ngModel]="raisePercentage()" (ngModelChange)="raisePercentage.set($event ? +$event : null)" name="raisePercentage" required min="0" placeholder="e.g., 30" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
+              <label for="raiseAmount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Salary Raise Amount (PHP)</label>
+              <input type="number" id="raiseAmount" [ngModel]="raiseAmount()" (ngModelChange)="raiseAmount.set($event ? +$event : null)" name="raiseAmount" required min="0" placeholder="e.g., 500" class="mt-1 block w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-0 text-gray-900 dark:text-gray-200">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
